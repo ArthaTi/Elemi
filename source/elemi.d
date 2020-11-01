@@ -63,6 +63,9 @@ struct Element {
 
     // Commonly used elements
 
+    /// Doctype info for HTML.
+    enum HTMLDoctype = "<!DOCTYPE html>";
+
     /// A common head element for adjusting the viewport to mobile devices.
     enum MobileViewport = elem!("meta", q{
         name="viewport"
@@ -290,7 +293,7 @@ unittest {
     import std.stdio : writeln;
     import std.base64 : Base64;
 
-    enum page = "<!DOCTYPE html>" ~ elem!"html"(
+    enum page = Element.HTMLDoctype ~ elem!"html"(
 
         elem!"head"(
 
@@ -358,5 +361,28 @@ unittest {
     ].join);
 
     assert(page == target);
+
+}
+
+// README example
+unittest {
+
+    import elemi : elem, Element;
+
+    auto document = Element.HTMLDoctype ~ elem!"html"(
+
+        elem!"head"(
+            elem!"title"("Hello, World!"),
+            Element.MobileViewport,
+        ),
+
+        elem!"body"(
+
+            // All input is sanitized.
+            "<Welcome to my website!>"
+
+        ),
+
+    );
 
 }
