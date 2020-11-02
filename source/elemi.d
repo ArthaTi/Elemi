@@ -156,20 +156,10 @@ struct Element {
 
     }
 
-    /// Add an element as a child
-    Element add(Element element) {
+    /// Add a child
+    Element add(T...)(T content) {
 
-        html ~= element;
-        return this;
-
-    }
-
-    /// Add text as a child.
-    ///
-    /// The text will automatically be sanitized.
-    Element add(string text) {
-
-        html ~= text.escapeHTML;
+        html ~= content.processContent;
         return this;
 
     }
@@ -285,8 +275,12 @@ unittest {
         elem!("div", q{ style="background:#500" })
             .add!"p"("Hello, World!")
             .add("-> Sanitized")
+            .add(
+                " and",
+                " clear"
+            )
 
-        == `<div style="background:#500"><p>Hello, World!</p>-&gt; Sanitized</div>`
+        == `<div style="background:#500"><p>Hello, World!</p>-&gt; Sanitized and clear</div>`
 
     );
 
