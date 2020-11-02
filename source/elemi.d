@@ -1,3 +1,4 @@
+
 module elemi;
 
 import std.conv;
@@ -133,7 +134,8 @@ struct Element {
     }
 
     /// Create a new element as a child
-    Element add(string name, string[string] attributes = null, T...)(T content) {
+    Element add(string name, string[string] attributes = null, T...)(T content)
+    if (!T.length || !is(T[0] == string[string])) {
 
         html ~= elem!(name, attributes)(content);
         return this;
@@ -149,7 +151,8 @@ struct Element {
     }
 
     /// Ditto
-    Element add(string name, string attrHTML, T...)(T content) {
+    Element add(string name, string attrHTML, T...)(T content)
+    if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 
         html ~= elem!(name, attrHTML)(null, content);
         return this;
@@ -209,7 +212,7 @@ Element elem(string name, string attrHTML = null, T...)(string[string] attribute
 
 /// Ditto
 Element elem(string name, string attrHTML, T...)(T content)
-if (!T.length || !is(T[0] == typeof(null)) ) {
+if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 
     return elem!(name, attrHTML)(null, content);
 
@@ -264,9 +267,13 @@ unittest {
     // Sanitized user input in attributes
     assert(
 
-        elem!"input"(["value": `"XSS!"`])
-        == `<input value="&quot;XSS!&quot;" />`
+        elem!"input"(["type": "text", "value": `"XSS!"`])
+        == `<input type="text" value="&quot;XSS!&quot;" />`
 
+    );
+    assert(
+        elem!("input", q{ type="text" })(["value": `"XSS!"`])
+        == `<input type="text" value="&quot;XSS!&quot;" />`
     );
 
     // Alternative method of nesting
