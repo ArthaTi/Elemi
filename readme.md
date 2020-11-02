@@ -12,6 +12,7 @@ auto document = Element.HTMLDoctype ~ elem!"html"(
     elem!"head"(
         elem!"title"("Hello, World!"),
         Element.MobileViewport,
+        Element.EncodingUTF8,
     ),
 
     elem!"body"(

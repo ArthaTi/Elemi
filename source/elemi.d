@@ -66,6 +66,11 @@ struct Element {
     /// Doctype info for HTML.
     enum HTMLDoctype = "<!DOCTYPE html>";
 
+    /// Enables UTF-8 encoding for the document
+    enum EncodingUTF8 = elem!("meta", q{
+        charset="utf-8"
+    });
+
     /// A common head element for adjusting the viewport to mobile devices.
     enum MobileViewport = elem!("meta", q{
         name="viewport"
@@ -301,6 +306,7 @@ unittest {
 
             // Metadata
             Element.MobileViewport,
+            Element.EncodingUTF8,
 
             elem!("style")(`
 
@@ -327,9 +333,7 @@ unittest {
         elem!"body"(
 
             elem!("header", q{ class="header" })(
-
                 elem!"h1"("Example website")
-
             ),
 
             elem!"h1"("Welcome to my website!"),
@@ -348,16 +352,16 @@ unittest {
     enum target = cast(string) Base64.decode([
         "PCFET0NUWVBFIGh0bWw+PGh0bWw+PGhlYWQ+PHRpdGxlPkFuIGV4YW1wbGUgZG9jdW",
         "1lbnQ8L3RpdGxlPjxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1k",
-        "ZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MSIgLz48c3R5bGU+aHRtbCwgYm9keS",
-        "B7aGVpZ2h0OiAxMDAlO2ZvbnQtZmFtaWx5OiBzYW5zLXNlcmlmO3BhZGRpbmc6IDA7",
-        "bWFyZ2luOiAwO30uaGVhZGVyIHtiYWNrZ3JvdW5kOiAjZjdhO2ZvbnQtc2l6ZTogMS",
-        "41ZW07bWFyZ2luOiAwO3BhZGRpbmc6IDVweDt9LmFydGljbGUge3BhZGRpbmctbGVm",
-        "dDogMmVtO308L3N0eWxlPjwvaGVhZD48Ym9keT48aGVhZGVyIGNsYXNzPSJoZWFkZX",
-        "IiPjxoMT5FeGFtcGxlIHdlYnNpdGU8L2gxPjwvaGVhZGVyPjxoMT5XZWxjb21lIHRv",
-        "IG15IHdlYnNpdGUhPC9oMT48cD5IZWxsbyB0aGVyZSw8YnIvPm1heSB5b3Ugd2FudC",
-        "B0byByZWFkIHNvbWUgb2YgbXkgYXJ0aWNsZXM/PC9wPjxkaXYgY2xhc3M9ImFydGlj",
-        "bGUiPjxoMj5TdHVmZjwvaDI+PHA+RGVzY3JpcHRpb248L3A+PC9kaXY+PC9ib2R5Pj",
-        "wvaHRtbD4="
+        "ZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MSIgLz48bWV0YSBjaGFyc2V0PSJ1dG",
+        "YtOCIgLz48c3R5bGU+aHRtbCwgYm9keSB7aGVpZ2h0OiAxMDAlO2ZvbnQtZmFtaWx5",
+        "OiBzYW5zLXNlcmlmO3BhZGRpbmc6IDA7bWFyZ2luOiAwO30uaGVhZGVyIHtiYWNrZ3",
+        "JvdW5kOiAjZjdhO2ZvbnQtc2l6ZTogMS41ZW07bWFyZ2luOiAwO3BhZGRpbmc6IDVw",
+        "eDt9LmFydGljbGUge3BhZGRpbmctbGVmdDogMmVtO308L3N0eWxlPjwvaGVhZD48Ym",
+        "9keT48aGVhZGVyIGNsYXNzPSJoZWFkZXIiPjxoMT5FeGFtcGxlIHdlYnNpdGU8L2gx",
+        "PjwvaGVhZGVyPjxoMT5XZWxjb21lIHRvIG15IHdlYnNpdGUhPC9oMT48cD5IZWxsby",
+        "B0aGVyZSw8YnIvPm1heSB5b3Ugd2FudCB0byByZWFkIHNvbWUgb2YgbXkgYXJ0aWNs",
+        "ZXM/PC9wPjxkaXYgY2xhc3M9ImFydGljbGUiPjxoMj5TdHVmZjwvaDI+PHA+RGVzY3",
+        "JpcHRpb248L3A+PC9kaXY+PC9ib2R5PjwvaHRtbD4=",
     ].join);
 
     assert(page == target);
@@ -374,6 +378,7 @@ unittest {
         elem!"head"(
             elem!"title"("Hello, World!"),
             Element.MobileViewport,
+            Element.EncodingUTF8,
         ),
 
         elem!"body"(
