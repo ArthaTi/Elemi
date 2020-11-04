@@ -127,6 +127,13 @@ struct Element {
 
     }
 
+    unittest {
+
+        const Element elem;
+        assert(elem == "");
+
+    }
+
     string toString() const {
 
         return html ~ postHTML;
@@ -164,6 +171,24 @@ struct Element {
 
         html ~= content.processContent;
         return this;
+
+    }
+
+    /// Add trusted HTML code as a child.
+    Element addTrusted(string code) {
+
+        html ~= elemTrusted(code);
+        return this;
+
+    }
+
+    ///
+    unittest {
+
+        assert(
+            elem!"p".addTrusted("<b>test</b>")
+            == "<p><b>test</b></p>"
+        );
 
     }
 
@@ -389,6 +414,33 @@ unittest {
 
         ),
 
+    );
+
+}
+
+/// Create an element from trusted HTML code.
+///
+/// Warning: This element cannot have children added after being created. They will be added as siblings instead.
+Element elemTrusted(string code) {
+
+    Element element;
+    element.html = code;
+    return element;
+
+}
+
+///
+unittest {
+
+    assert(elemTrusted("<p>test</p>") == "<p>test</p>");
+    assert(
+        elem!"p"(
+            elemTrusted("<b>foo</b>bar"),
+        ) == "<p><b>foo</b>bar</p>"
+    );
+    assert(
+        elemTrusted("<b>test</b>").add("<b>foo</b>")
+        == "<b>test</b>&lt;b&gt;foo&lt;/b&gt;"
     );
 
 }
