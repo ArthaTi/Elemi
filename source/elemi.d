@@ -38,6 +38,8 @@ package string serializeAttributes(string[string] attributes) {
 /// Process the given content, sanitizing user input and passing in already created elements.
 package string processContent(T...)(T content) {
 
+    import std.range : isInputRange;
+
     string contentText;
     static foreach (i, Type; T) {
 
@@ -46,6 +48,17 @@ package string processContent(T...)(T content) {
 
             /// Escape it and add
             contentText ~= content[i].escapeHTML;
+
+        }
+
+        // Given a range of elements
+        else static if (isInputRange!Type) {
+
+            foreach (item; content[i]) {
+
+                contentText ~= item;
+
+            }
 
         }
 
@@ -316,6 +329,17 @@ unittest {
 
     );
 
+    import std.range : repeat;
+
+    // Adding elements by ranges
+    assert(
+        elem!"ul"(
+            "element".elem!"li".repeat(3)
+        )
+        == "<ul><li>element</li><li>element</li><li>element</li></ul>"
+
+    );
+
 }
 
 /// A general example page
@@ -338,7 +362,7 @@ unittest {
 
                 html, body {
                     height: 100%;
-                    font-family: sans-serif;
+                   font-family: sans-serif;
                     padding: 0;
                     margin: 0;
                 }
