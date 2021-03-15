@@ -8,9 +8,20 @@ import std.algorithm;
 /// Escape HTML elements.
 ///
 /// Package level: input sanitization is done automatically by the library.
-package string escapeHTML(const string text) {
+package string escapeHTML(const string text) pure {
 
-    return text.substitute!(
+    if (__ctfe) {
+
+        return text
+            .replace(`<`, "&lt;")
+            .replace(`>`, "&gt;")
+            .replace(`&`, "&amp;")
+            .replace(`"`, "&quot;")
+            .replace(`'`, "&#39;");
+
+    }
+
+    else return text.substitute!(
         `<`, "&lt;",
         `>`, "&gt;",
         `&`, "&amp;",
@@ -21,7 +32,7 @@ package string escapeHTML(const string text) {
 }
 
 /// Serialize attributes
-package string serializeAttributes(string[string] attributes) {
+package string serializeAttributes(string[string] attributes) pure {
 
     // Generate attribute text
     string attrHTML;
@@ -36,7 +47,7 @@ package string serializeAttributes(string[string] attributes) {
 }
 
 /// Process the given content, sanitizing user input and passing in already created elements.
-package string processContent(T...)(T content) {
+package string processContent(T...)(T content) pure {
 
     import std.range : isInputRange;
 
@@ -101,7 +112,7 @@ struct Element {
 
     }
 
-    package this(const string name, const string attributes = null, const string content = null) {
+    package this(const string name, const string attributes = null, const string content = null) pure {
 
         auto attrHTML = attributes.dup;
 
@@ -147,14 +158,14 @@ struct Element {
 
     }
 
-    string toString() const {
+    string toString() const pure {
 
         return html ~ postHTML;
 
     }
 
     /// Create a new element as a child
-    Element add(string name, string[string] attributes = null, T...)(T content)
+    Element add(string name, string[string] attributes = null, T...)(T content) pure
     if (!T.length || !is(T[0] == string[string])) {
 
         html ~= elem!(name, attributes)(content);
@@ -163,7 +174,7 @@ struct Element {
     }
 
     /// Ditto
-    Element add(string name, string attrHTML = null, T...)(string[string] attributes, T content) {
+    Element add(string name, string attrHTML = null, T...)(string[string] attributes, T content) pure {
 
         html ~= elem!(name, attrHTML)(attributes, content);
         return this;
@@ -171,7 +182,7 @@ struct Element {
     }
 
     /// Ditto
-    Element add(string name, string attrHTML, T...)(T content)
+    Element add(string name, string attrHTML, T...)(T content) pure
     if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 
         html ~= elem!(name, attrHTML)(null, content);
@@ -180,7 +191,7 @@ struct Element {
     }
 
     /// Add a child
-    Element add(T...)(T content) {
+    Element add(T...)(T content) pure {
 
         html ~= content.processContent;
         return this;
@@ -188,7 +199,7 @@ struct Element {
     }
 
     /// Add trusted HTML code as a child.
-    Element addTrusted(string code) {
+    Element addTrusted(string code) pure {
 
         html ~= elemTrusted(code);
         return this;
@@ -218,7 +229,7 @@ struct Element {
 ///     attributes = Attributes for the element.
 ///     children = Children and text of the element.
 /// Returns: a Element type, implictly castable to string.
-Element elem(string name, string[string] attributes = null, T...)(T content)
+Element elem(string name, string[string] attributes = null, T...)(T content) pure
 if (!T.length || !is(T[0] == string[string])) {
 
     // Ensure attribute HTML is generated compile-time.
@@ -229,7 +240,7 @@ if (!T.length || !is(T[0] == string[string])) {
 }
 
 /// Ditto
-Element elem(string name, string attrHTML = null, T...)(string[string] attributes, T content) {
+Element elem(string name, string attrHTML = null, T...)(string[string] attributes, T content) pure {
 
     import std.stdio : writeln;
 
@@ -249,7 +260,7 @@ Element elem(string name, string attrHTML = null, T...)(string[string] attribute
 }
 
 /// Ditto
-Element elem(string name, string attrHTML, T...)(T content)
+Element elem(string name, string attrHTML, T...)(T content) pure
 if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 
     return elem!(name, attrHTML)(null, content);
@@ -445,7 +456,7 @@ unittest {
 /// Create an element from trusted HTML code.
 ///
 /// Warning: This element cannot have children added after being created. They will be added as siblings instead.
-Element elemTrusted(string code) {
+Element elemTrusted(string code) pure {
 
     Element element;
     element.html = code;
@@ -466,5 +477,12 @@ unittest {
         elemTrusted("<b>test</b>").add("<b>foo</b>")
         == "<b>test</b>&lt;b&gt;foo&lt;/b&gt;"
     );
+
+}
+
+// Issue #1
+unittest {
+
+    enum Foo = elem!("p")("<unsafe>code</unsafe>");
 
 }

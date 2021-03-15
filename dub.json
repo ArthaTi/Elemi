@@ -6,7 +6,6 @@
 	"description": "A simple HTML creation helper.",
 	"license": "BSL-1.0",
 	"name": "elemi",
-	"version": "1.0.2-beta-1",
 	"targetType": "staticLibrary",
 	"targetPath": "build"
 }
