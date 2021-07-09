@@ -5,10 +5,12 @@ import std.conv;
 import std.string;
 import std.algorithm;
 
+pure @safe:
+
 /// Escape HTML elements.
 ///
 /// Package level: input sanitization is done automatically by the library.
-package string escapeHTML(const string text) pure {
+package string escapeHTML(const string text) {
 
     if (__ctfe) {
 
@@ -32,7 +34,7 @@ package string escapeHTML(const string text) pure {
 }
 
 /// Serialize attributes
-package string serializeAttributes(string[string] attributes) pure {
+package string serializeAttributes(string[string] attributes) {
 
     // Generate attribute text
     string attrHTML;
@@ -47,7 +49,7 @@ package string serializeAttributes(string[string] attributes) pure {
 }
 
 /// Process the given content, sanitizing user input and passing in already created elements.
-package string processContent(T...)(T content) pure {
+package string processContent(T...)(T content) {
 
     import std.range : isInputRange;
 
@@ -112,7 +114,9 @@ struct Element {
 
     }
 
-    package this(const string name, const string attributes = null, const string content = null) pure {
+    pure @safe:
+
+    package this(const string name, const string attributes = null, const string content = null) {
 
         auto attrHTML = attributes.dup;
 
@@ -158,14 +162,14 @@ struct Element {
 
     }
 
-    string toString() const pure {
+    string toString() const {
 
         return html ~ postHTML;
 
     }
 
     /// Create a new element as a child
-    Element add(string name, string[string] attributes = null, T...)(T content) pure
+    Element add(string name, string[string] attributes = null, T...)(T content)
     if (!T.length || !is(T[0] == string[string])) {
 
         html ~= elem!(name, attributes)(content);
@@ -174,7 +178,7 @@ struct Element {
     }
 
     /// Ditto
-    Element add(string name, string attrHTML = null, T...)(string[string] attributes, T content) pure {
+    Element add(string name, string attrHTML = null, T...)(string[string] attributes, T content) {
 
         html ~= elem!(name, attrHTML)(attributes, content);
         return this;
@@ -182,7 +186,7 @@ struct Element {
     }
 
     /// Ditto
-    Element add(string name, string attrHTML, T...)(T content) pure
+    Element add(string name, string attrHTML, T...)(T content)
     if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 
         html ~= elem!(name, attrHTML)(null, content);
@@ -191,7 +195,7 @@ struct Element {
     }
 
     /// Add a child
-    Element add(T...)(T content) pure {
+    Element add(T...)(T content) {
 
         html ~= content.processContent;
         return this;
@@ -199,7 +203,7 @@ struct Element {
     }
 
     /// Add trusted HTML code as a child.
-    Element addTrusted(string code) pure {
+    Element addTrusted(string code) {
 
         html ~= elemTrusted(code);
         return this;
@@ -229,7 +233,7 @@ struct Element {
 ///     attributes = Attributes for the element.
 ///     children = Children and text of the element.
 /// Returns: a Element type, implictly castable to string.
-Element elem(string name, string[string] attributes = null, T...)(T content) pure
+Element elem(string name, string[string] attributes = null, T...)(T content)
 if (!T.length || !is(T[0] == string[string])) {
 
     // Ensure attribute HTML is generated compile-time.
@@ -240,7 +244,7 @@ if (!T.length || !is(T[0] == string[string])) {
 }
 
 /// Ditto
-Element elem(string name, string attrHTML = null, T...)(string[string] attributes, T content) pure {
+Element elem(string name, string attrHTML = null, T...)(string[string] attributes, T content) {
 
     import std.stdio : writeln;
 
@@ -260,7 +264,7 @@ Element elem(string name, string attrHTML = null, T...)(string[string] attribute
 }
 
 /// Ditto
-Element elem(string name, string attrHTML, T...)(T content) pure
+Element elem(string name, string attrHTML, T...)(T content)
 if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 
     return elem!(name, attrHTML)(null, content);
@@ -354,6 +358,7 @@ unittest {
 }
 
 /// A general example page
+@system
 unittest {
 
     import std.stdio : writeln;
@@ -456,7 +461,7 @@ unittest {
 /// Create an element from trusted HTML code.
 ///
 /// Warning: This element cannot have children added after being created. They will be added as siblings instead.
-Element elemTrusted(string code) pure {
+Element elemTrusted(string code) {
 
     Element element;
     element.html = code;
