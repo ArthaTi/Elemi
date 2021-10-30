@@ -530,7 +530,7 @@ unittest {
 // README example
 unittest {
 
-    import elemi : elem, Element;
+    import elemi;
 
     auto document = Element.HTMLDoctype ~ elem!"html"(
 
@@ -546,6 +546,25 @@ unittest {
             "<Welcome to my website!>"
 
         ),
+
+    );
+
+    auto xml = Element.XMLDeclaration ~ elemX!("feed", `xmlns="http://www.w3.org/2005/Atom"`)(
+
+        elemX!"title"("Example feed"),
+        elemX!"subtitle"("Showcasing using elemi for generating XML"),
+        elemX!"updated"("2021-10-30T20:30:00Z"),
+
+        elemX!"entry"(
+            elemX!"title"("Elemi home page"),
+            elemX!("link", `href="https://github.com/Soaku/Elemi"`),
+            elemX!"updated"("2021-10-30T20:30:00Z"),
+            elemX!"summary"("Elemi repository on GitHub"),
+            elemX!"author"(
+                 elemX!"Soaku",
+                 elemX!"soaku@samerion.com"
+            )
+        )
 
     );
 
