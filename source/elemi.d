@@ -83,6 +83,12 @@ package string processContent(T...)(T content) {
 
 }
 
+unittest {
+
+    assert(processContent() == "");
+
+}
+
 /// Represents a HTML element.
 ///
 /// Use [elem] to generate.
@@ -116,7 +122,9 @@ struct Element {
 
     pure @safe:
 
-    package this(const string name, const string attributes = null, const string content = null) {
+    private this(const string name, const string attributes = null, const string content = null,
+        bool selfClosing = false)
+    do {
 
         auto attrHTML = attributes.dup;
 
@@ -129,25 +137,25 @@ struct Element {
         }
 
         // Create the ending tag
-        switch (name) {
+        if (selfClosing) {
 
-            // Empty elements
-            case "area", "base", "br", "col", "embed", "hr", "img", "input":
-            case "keygen", "link", "meta", "param", "source", "track", "wbr":
+            assert(content.length == 0,
+                "Self-closing tag " ~ name ~ " cannot have children, its content must be empty."
+                ~ format!"content(%s) = \"%(%s%)\""(content.length, content));
 
-                assert(content.length == 0, "Tag %s cannot have children, its content must be empty.".format(name));
+            // Instead of a tag end, add a slash at the end of the beginning tag
+            // Also add a space if there are any attributes
+            attrHTML ~= (attrHTML ? " " : "") ~ "/";
+            // Review note: The space is probably not necessary, but should be kept as Elemi output is not meant to
+            // change for the same code.
 
-                // Instead of a tag end, add a slash at the end of the beginning tag
-                // Also add a space if there are any attributes
-                attrHTML ~= (attrHTML ? " " : "") ~ "/";
+        }
 
-                break;
+        // A container tag
+        else {
 
-            // Containers
-            default:
-
-                // Add the end tag
-                postHTML = name.format!"</%s>";
+            // Add the end tag
+            postHTML = name.format!"</%s>";
 
         }
 
@@ -220,6 +228,32 @@ struct Element {
 
     }
 
+    /// Create a new XML element as a child
+    Element addX(string name, string[string] attributes = null, T...)(T content)
+    if (!T.length || !is(T[0] == string[string])) {
+
+        html ~= elemX!(name, attributes)(content);
+        return this;
+
+    }
+
+    /// Ditto
+    Element addX(string name, string attrHTML = null, T...)(string[string] attributes, T content) {
+
+        html ~= elemX!(name, attrHTML)(attributes, content);
+        return this;
+
+    }
+
+    /// Ditto
+    Element addX(string name, string attrHTML, T...)(T content)
+    if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
+
+        html ~= elemX!(name, attrHTML)(null, content);
+        return this;
+
+    }
+
     // Yes. This is legal.
     alias toString this;
 
@@ -230,23 +264,27 @@ struct Element {
 /// Params:
 ///     name = Name of the element.
 ///     attrHTML = Unsanitized attributes to insert.
-///     attributes = Attributes for the element.
+///     attributes = Attributes for the element as an associative array mapping attribute names to their values.
 ///     children = Children and text of the element.
 /// Returns: a Element type, implictly castable to string.
 Element elem(string name, string[string] attributes = null, T...)(T content)
 if (!T.length || !is(T[0] == string[string])) {
 
+    // Overload 1: attributes from a CTFE hash map
+
     // Ensure attribute HTML is generated compile-time.
     enum attrHTML = attributes.serializeAttributes;
 
-    return Element(name, attrHTML, content.processContent);
+    enum close = name.isVoidTag;
+
+    return Element(name, attrHTML, content.processContent, close);
 
 }
 
 /// Ditto
 Element elem(string name, string attrHTML = null, T...)(string[string] attributes, T content) {
 
-    import std.stdio : writeln;
+    // Overload 2: attributes from a CTFE attribute string and from a runtime hash map
 
     enum attrInput = attrHTML.splitter("\n")
         .map!q{a.strip}
@@ -255,10 +293,13 @@ Element elem(string name, string attrHTML = null, T...)(string[string] attribute
 
     enum prefix = attrHTML.length ? " " : "";
 
+    enum close = name.isVoidTag;
+
     return Element(
         name,
         prefix ~ attrInput ~ attributes.serializeAttributes,
-        content.processContent
+        content.processContent,
+        close,
     );
 
 }
@@ -267,14 +308,16 @@ Element elem(string name, string attrHTML = null, T...)(string[string] attribute
 Element elem(string name, string attrHTML, T...)(T content)
 if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 
+    import std.stdio;
+
+    // Overload 3: attributes from a CTFE attribute string
+
     return elem!(name, attrHTML)(null, content);
 
 }
 
 ///
 unittest {
-
-    import std.stdio : writeln;
 
     // Compile-time empty type detection
     assert(elem!"input" == "<input/>");
@@ -458,7 +501,7 @@ unittest {
 
 }
 
-/// Create an element from trusted HTML code.
+/// Create an element from trusted HTML/XML code.
 ///
 /// Warning: This element cannot have children added after being created. They will be added as siblings instead.
 Element elemTrusted(string code) {
@@ -482,6 +525,154 @@ unittest {
         elemTrusted("<b>test</b>").add("<b>foo</b>")
         == "<b>test</b>&lt;b&gt;foo&lt;/b&gt;"
     );
+
+}
+
+/// Create an XML element.
+///
+/// Params:
+///     name = Name of the element. If the name ends with a slash, the tag will be made self-closing and will not accept
+///         children.
+///     attrHTML = Unsanitized attributes to insert.
+///     attributes = Attributes for the element, as an.
+///     children = Children and text of the element.
+/// Returns: a Element type, implictly castable to string.
+Element elemX(string name, string[string] attributes = null, T...)(T content)
+if (!T.length || !is(T[0] == string[string])) {
+
+    // Overload 1: attributes from a CTFE hash map
+
+    // Ensure attribute code is generated compile-time.
+    enum attrHTML = attributes.serializeAttributes;
+
+    alias data = XMLTagData!name;
+
+    return Element(data.tagName, attrHTML, content.processContent, data.isSelfClosing);
+
+}
+
+/// Ditto
+Element elemX(string name, string attrHTML = null, T...)(string[string] attributes, T content) {
+
+    // Overload 2: attributes from a CTFE attribute string and from a runtime hash map
+
+    enum attrInput = attrHTML.splitter("\n")
+        .map!q{a.strip}
+        .filter!q{a.length}
+        .join(" ");
+
+    enum prefix = attrHTML.length ? " " : "";
+
+    alias data = XMLTagData!name;
+
+    return Element(
+        data.tagName,
+        prefix ~ attrInput ~ attributes.serializeAttributes,
+        content.processContent,
+        data.isSelfClosing,
+    );
+
+}
+
+/// Ditto
+Element elemX(string name, string attrHTML, T...)(T content)
+if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
+
+    import std.stdio;
+
+    // Overload 3: attributes from a CTFE attribute string
+
+    return elemX!(name, attrHTML)(null, content);
+
+}
+
+///
+unittest {
+
+    enum xml = elemX!"xml"(
+        elemX!"heading"("This is my sample document!"),
+        elemX!("spacing /", q{ height="1em" }),
+        elemX!"spacing /"(["height": "1em"]),
+        elemX!"empty",
+        elemX!"br",
+        elemX!"container"
+            .addX!"paragraph"("Foo")
+            .addX!"paragraph"("Bar"),
+    );
+
+    assert(xml == "<xml>" ~ (
+            "<heading>This is my sample document!</heading>"
+            ~ `<spacing height="1em" />`
+            ~ `<spacing height="1em" />`
+            ~ `<empty></empty>`
+            ~ `<br></br>`
+            ~ "<container>" ~ (
+                "<paragraph>Foo</paragraph>"
+                ~ "<paragraph>Bar</paragraph>"
+            ) ~ "</container>"
+        ) ~ "</xml>");
+
+}
+
+/// Check if the given tag is a HTML5 self-closing tag.
+bool isVoidTag(string tag) {
+
+    switch (tag) {
+
+        // Void element
+        case "area", "base", "br", "col", "command", "embed", "hr", "img", "input":
+        case "keygen", "link", "meta", "param", "source", "track", "wbr":
+
+            return true;
+
+        // Containers
+        default:
+
+            return false;
+
+    }
+
+}
+
+/// Get XML element data from Elemi tag name notation.
+template XMLTagData(string tag) {
+
+    static if (tag.endsWith("/")) {
+
+        enum tagName = tag[0..$-1].stripRight;
+        enum isSelfClosing = true;
+
+    }
+
+    else {
+
+        enum tagName = tag;
+        enum isSelfClosing = false;
+
+    }
+
+}
+
+unittest {
+
+    void assertValid(string tag, string expectedString, bool expectedBool)() {
+
+        alias data = XMLTagData!tag;
+
+        assert(data.isSelfClosing == expectedBool, format!"wrong bool result for string \"%s\""(data.tagName));
+        assert(data.tagName == expectedString, format!("wrong string result for string \"%s\", \"%s\" vs expected"
+            ~ " \"%s\"")(tag, data.tagName, expectedString));
+
+    }
+
+    assertValid!("br",   "br",  false);
+    assertValid!("br ",  "br ", false);
+    assertValid!("br /", "br",  true);
+    assertValid!("br/",  "br",  true);
+
+    assertValid!("myFancyTag",    "myFancyTag", false);
+    assertValid!("myFancyTag /",  "myFancyTag", true);
+    assertValid!("myFancyTäg /",  "myFancyTäg", true);
 
 }
 
