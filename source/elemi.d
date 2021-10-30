@@ -126,8 +126,9 @@ struct Element {
 
     package {
 
-        /// If true, the elements trusts its content and will not sanitize it.
-        bool trustContent;
+        /// If true, this is a preprocessor directive like `<!DOCTYPE>` or `<?xml >`. It's self-closing, and its content
+        /// is placed within the tag itself.
+        bool directive;
 
         /// HTML of the element.
         string html;
@@ -178,7 +179,7 @@ struct Element {
                 // Place everything within the tag, and add a question mark at the end
                 trail = " ";
                 postHTML = " ?>";
-                trustContent = true;
+                directive = true;
 
                 break;
 
@@ -187,7 +188,7 @@ struct Element {
                 // Place everything within the tag
                 trail = " ";
                 postHTML = ">";
-                trustContent = true;
+                directive = true;
 
                 break;
 
@@ -214,7 +215,9 @@ struct Element {
 
     string toString() const {
 
-        return html.stripRight ~ postHTML;
+        return directive
+            ? html.stripRight ~ postHTML
+            : html ~ postHTML;
 
     }
 
@@ -247,7 +250,7 @@ struct Element {
     /// Add a child
     Element add(T...)(T content) {
 
-        html ~= content.processContent(!trustContent);
+        html ~= content.processContent(!directive);
         return this;
 
     }
@@ -441,6 +444,9 @@ unittest {
         == "<ul><li>element</li><li>element</li><li>element</li></ul>"
 
     );
+
+    // Significant whitespace
+    assert(elem!"span"(" Foo ") == "<span> Foo </span>");
 
 }
 
