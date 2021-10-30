@@ -48,8 +48,17 @@ package string serializeAttributes(string[string] attributes) {
 
 }
 
+
 /// Process the given content, sanitizing user input and passing in already created elements.
-package string processContent(T...)(T content) {
+package string processContent(T...)(T content)
+if (!T.length || !is(T[$-1] == bool)) {
+
+    return processContent(content, true);
+
+}
+
+/// Ditto
+package string processContent(T...)(T content, bool escape) {
 
     import std.range : isInputRange;
 
@@ -59,12 +68,14 @@ package string processContent(T...)(T content) {
         // Given a string
         static if (is(Type == string) || is(Type == wstring) || is(Type == dstring)) {
 
-            /// Escape it and add
-            contentText ~= content[i].escapeHTML;
+            // Escape it and add
+            contentText ~= escape
+                ? content[i].escapeHTML
+                : content[i];
 
         }
 
-        // Given a range of elements
+        // Given a range of elements (this is unsafe! needs a patch)
         else static if (isInputRange!Type) {
 
             foreach (item; content[i]) {
@@ -97,7 +108,10 @@ struct Element {
     // Commonly used elements
 
     /// Doctype info for HTML.
-    enum HTMLDoctype = "<!DOCTYPE html>";
+    enum HTMLDoctype = elemX!("!DOCTYPE", "html");
+
+    /// XML declaration element. Uses version 1.1.
+    enum XMLDeclaration = elemX!("?xml", q{ version="1.1" encoding="UTF-8" });
 
     /// Enables UTF-8 encoding for the document
     enum EncodingUTF8 = elem!("meta", q{
@@ -112,54 +126,82 @@ struct Element {
 
     package {
 
+        /// If true, the elements trusts its content and will not sanitize it.
+        bool trustContent;
+
         /// HTML of the element.
         string html;
 
-        /// Added at the end
+        /// Added at the end.
         string postHTML;
 
     }
 
     pure @safe:
 
-    private this(const string name, const string attributes = null, const string content = null,
-        bool selfClosing = false)
+    private this(string name, string attributes = null, string content = null,
+        ElementType type = ElementType.startEndTag)
     do {
 
-        auto attrHTML = attributes.dup;
+        // Character denoting tag end
+        string trail;
 
-        // Asserts on attributes
-        debug if (attributes.length) {
+        with (ElementType)
+        final switch (type) {
 
-            assert(attributes[0] == ' ', "The first character of attributes isn't a space");
-            assert(attributes[1] != ' ', "The second character of attributes cannot be a space");
+            // Start and end tag combo
+            case ElementType.startEndTag:
+
+                // Add the end tag
+                trail = ">";
+                postHTML = name.format!"</%s>";
+                break;
+
+            // Create a self-closing tag
+            case ElementType.emptyElementTag:
+
+                assert(content.length == 0,
+                    "Self-closing tag " ~ name ~ " cannot have children, its content must be empty."
+                    ~ format!"content(%s) = \"%(%s%)\""(content.length, content));
+
+                // Instead of a tag end, add a slash at the end of the beginning tag
+                // Also add a space if there are any attributes
+                trail = (attributes.length ? " " : "") ~ "/>";
+                // Review note: The space is probably not necessary, but should be kept as Elemi output is not meant to
+                // change for the same code.
+
+                break;
+
+            // XML declaration
+            case ElementType.declarationTag:
+
+                // Place everything within the tag, and add a question mark at the end
+                trail = " ";
+                postHTML = " ?>";
+                trustContent = true;
+
+                break;
+
+            case ElementType.doctypeTag:
+
+                // Place everything within the tag
+                trail = " ";
+                postHTML = ">";
+                trustContent = true;
+
+                break;
 
         }
 
-        // Create the ending tag
-        if (selfClosing) {
+        // Attributes in
+        if (attributes.length) {
 
-            assert(content.length == 0,
-                "Self-closing tag " ~ name ~ " cannot have children, its content must be empty."
-                ~ format!"content(%s) = \"%(%s%)\""(content.length, content));
-
-            // Instead of a tag end, add a slash at the end of the beginning tag
-            // Also add a space if there are any attributes
-            attrHTML ~= (attrHTML ? " " : "") ~ "/";
-            // Review note: The space is probably not necessary, but should be kept as Elemi output is not meant to
-            // change for the same code.
+            html = format!"<%s %s%s%s"(name, attributes.stripLeft, trail, content);
 
         }
 
-        // A container tag
-        else {
-
-            // Add the end tag
-            postHTML = name.format!"</%s>";
-
-        }
-
-        html = format!"<%s%s>%s"(name, attrHTML, content);
+        // No attributes
+        else html = format!"<%s%s%s"(name, trail, content);
 
     }
 
@@ -172,7 +214,7 @@ struct Element {
 
     string toString() const {
 
-        return html ~ postHTML;
+        return html.stripRight ~ postHTML;
 
     }
 
@@ -205,7 +247,7 @@ struct Element {
     /// Add a child
     Element add(T...)(T content) {
 
-        html ~= content.processContent;
+        html ~= content.processContent(!trustContent);
         return this;
 
     }
@@ -275,9 +317,11 @@ if (!T.length || !is(T[0] == string[string])) {
     // Ensure attribute HTML is generated compile-time.
     enum attrHTML = attributes.serializeAttributes;
 
-    enum close = name.isVoidTag;
+    enum type = name.isVoidTag
+        ? ElementType.emptyElementTag
+        : ElementType.startEndTag;
 
-    return Element(name, attrHTML, content.processContent, close);
+    return Element(name, attrHTML, content.processContent, type);
 
 }
 
@@ -291,15 +335,15 @@ Element elem(string name, string attrHTML = null, T...)(string[string] attribute
         .filter!q{a.length}
         .join(" ");
 
-    enum prefix = attrHTML.length ? " " : "";
-
-    enum close = name.isVoidTag;
+    enum type = name.isVoidTag
+        ? ElementType.emptyElementTag
+        : ElementType.startEndTag;
 
     return Element(
         name,
-        prefix ~ attrInput ~ attributes.serializeAttributes,
+        attrInput ~ attributes.serializeAttributes,
         content.processContent,
-        close,
+        type,
     );
 
 }
@@ -547,7 +591,7 @@ if (!T.length || !is(T[0] == string[string])) {
 
     alias data = XMLTagData!name;
 
-    return Element(data.tagName, attrHTML, content.processContent, data.isSelfClosing);
+    return Element(data.name, attrHTML, content.processContent(data.sanitize), data.type);
 
 }
 
@@ -561,15 +605,13 @@ Element elemX(string name, string attrHTML = null, T...)(string[string] attribut
         .filter!q{a.length}
         .join(" ");
 
-    enum prefix = attrHTML.length ? " " : "";
-
     alias data = XMLTagData!name;
 
     return Element(
-        data.tagName,
-        prefix ~ attrInput ~ attributes.serializeAttributes,
-        content.processContent,
-        data.isSelfClosing,
+        data.name,
+        attrInput ~ attributes.serializeAttributes,
+        content.processContent(data.sanitize),
+        data.type,
     );
 
 }
@@ -634,20 +676,47 @@ bool isVoidTag(string tag) {
 
 }
 
+enum ElementType {
+
+    startEndTag,
+    emptyElementTag,
+    declarationTag,
+    doctypeTag,
+
+}
+
 /// Get XML element data from Elemi tag name notation.
 template XMLTagData(string tag) {
 
-    static if (tag.endsWith("/")) {
+    static if (tag.startsWith("?")) {
 
-        enum tagName = tag[0..$-1].stripRight;
-        enum isSelfClosing = true;
+        enum name = tag;
+        enum type = ElementType.declarationTag;
+        enum sanitize = false;
+
+    }
+
+    else static if (tag.startsWith("!")) {
+
+        enum name = tag;
+        enum type = ElementType.doctypeTag;
+        enum sanitize = false;
+
+    }
+
+    else static if (tag.endsWith("/")) {
+
+        enum name = tag[0..$-1].stripRight;
+        enum type = ElementType.emptyElementTag;
+        enum sanitize = true;
 
     }
 
     else {
 
-        enum tagName = tag;
-        enum isSelfClosing = false;
+        enum name = tag;
+        enum type = ElementType.startEndTag;
+        enum sanitize = true;
 
     }
 
@@ -655,24 +724,32 @@ template XMLTagData(string tag) {
 
 unittest {
 
-    void assertValid(string tag, string expectedString, bool expectedBool)() {
+    void assertValid(string tag, string expectedString, ElementType expectedType)() {
 
         alias data = XMLTagData!tag;
 
-        assert(data.isSelfClosing == expectedBool, format!"wrong bool result for string \"%s\""(data.tagName));
-        assert(data.tagName == expectedString, format!("wrong string result for string \"%s\", \"%s\" vs expected"
-            ~ " \"%s\"")(tag, data.tagName, expectedString));
+        enum fmt = "wrong %s result for string \"%s\", %s vs expected %s";
+
+        assert(data.name == expectedString, format!fmt("string", tag, data.name, expectedString));
+        assert(data.type == expectedType,   format!fmt("type", tag, data.type, expectedType));
 
     }
 
-    assertValid!("br",   "br",  false);
-    assertValid!("br ",  "br ", false);
-    assertValid!("br /", "br",  true);
-    assertValid!("br/",  "br",  true);
+    with (ElementType) {
 
-    assertValid!("myFancyTag",    "myFancyTag", false);
-    assertValid!("myFancyTag /",  "myFancyTag", true);
-    assertValid!("myFancyTäg /",  "myFancyTäg", true);
+        assertValid!("br",   "br",  startEndTag);
+        assertValid!("br ",  "br ", startEndTag);
+        assertValid!("br /", "br",  emptyElementTag);
+        assertValid!("br/",  "br",  emptyElementTag);
+
+        assertValid!("myFancyTag",    "myFancyTag", startEndTag);
+        assertValid!("myFancyTag /",  "myFancyTag", emptyElementTag);
+        assertValid!("myFancyTäg /",  "myFancyTäg", emptyElementTag);
+
+        assertValid!("?br", "?br", declarationTag);
+        assertValid!("!br", "!br", doctypeTag);
+
+    }
 
 }
 
@@ -680,5 +757,33 @@ unittest {
 unittest {
 
     enum Foo = elem!("p")("<unsafe>code</unsafe>");
+
+}
+
+unittest {
+
+    assert(elemX!"p" == "<p></p>");
+    assert(elemX!"p /" == "<p/>");
+    assert(elemX!("!DOCTYPE", "html") == "<!DOCTYPE html>");
+    assert(Element.HTMLDoctype == "<!DOCTYPE html>");
+    assert(elemX!("!ATTLIST", "pre (preserve) #FIXED 'preserve'") == "<!ATTLIST pre (preserve) #FIXED 'preserve'>");
+    assert(elemX!"!ATTLIST"("pre (preserve) #FIXED 'preserve'") == "<!ATTLIST pre (preserve) #FIXED 'preserve'>");
+    assert(elemX!"!ATTLIST".add("pre (preserve) #FIXED 'preserve'") == "<!ATTLIST pre (preserve) #FIXED 'preserve'>");
+    assert(elemX!"?xml" == "<?xml ?>");
+    assert(elemX!("?xml", q{ version="1.1" encoding="UTF-8" }) == `<?xml version="1.1" encoding="UTF-8" ?>`);
+    assert(elemX!"?xml"(`version="1.1" encoding="UTF-8"`) == `<?xml version="1.1" encoding="UTF-8" ?>`);
+    assert(elemX!"?xml".add(`version="1.1" encoding="UTF-8"`) == `<?xml version="1.1" encoding="UTF-8" ?>`);
+    assert(Element.XMLDeclaration == `<?xml version="1.1" encoding="UTF-8" ?>`);
+    assert(elemX!"?xml"(["version": "1.1"]).addTrusted(`encoding="UTF-8"`)
+        == `<?xml version="1.1" encoding="UTF-8" ?>`);
+    assert(elemX!"?php" == "<?php ?>");
+    assert(elemX!"?php"(`echo "Hello, World!";`) == `<?php echo "Hello, World!"; ?>`);
+    assert(elemX!"?="(`"Hello, World!"`) == `<?= "Hello, World!" ?>`);
+    // ↑ I will not special-case this to remove spaces.
+
+    auto php = elemX!"?php";
+    php.add(`$target = "World!";`);
+    php.add(`echo "Hello, " . $target;`);
+    assert(php == `<?php $target = "World!";echo "Hello, " . $target; ?>`);
 
 }
