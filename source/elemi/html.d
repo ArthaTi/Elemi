@@ -19,6 +19,7 @@ pure @safe:
 
 // Magic elem alias
 alias elem = elemH;
+alias add = addH;
 
 /// Create a HTML element.
 ///
@@ -99,6 +100,9 @@ bool isVoidTag(string tag) {
 
 /// If the given tag is a void tag, make it a self-closing.
 private string makeHTMLTag(string tag) {
+
+    assert(tag.length && tag[$-1] != '/', "Self-closing tags are applied automatically when working with html, please"
+        ~ " remove the slash.");
 
     return isVoidTag(tag) ? tag ~ "/" : tag;
 

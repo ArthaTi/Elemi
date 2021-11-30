@@ -102,9 +102,18 @@ struct Element {
 
     }
 
+    /// Check if the element allows content.
+    bool acceptsContent() const {
+
+        return endTag.length || !startTag.length;
+
+    }
+
     /// Add trusted XML/HTML code as a child of this node.
     /// Returns: This node, to allow chaining.
     Element addTrusted(string code) {
+
+        assert(acceptsContent, "This element doesn't accept content");
 
         content ~= code;
         return this;
@@ -123,20 +132,22 @@ struct Element {
     }
 
     pragma(inline, true)
+    private void addItem(Attribute item) {
+
+        attributes ~= " " ~ item;
+
+    }
+
+    pragma(inline, true)
     private void addItem(Type)(Type item) {
 
         import std.range;
         import std.traits;
 
-        // Attribute
-        static if (is(Type : Attribute)) {
-
-            attributes ~= " " ~ item;
-
-        }
+        assert(acceptsContent, "This element doesn't accept content");
 
         // Element
-        else static if (is(Type : Element)) {
+        static if (is(Type : Element)) {
 
             content ~= item;
 

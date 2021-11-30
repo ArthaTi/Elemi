@@ -105,7 +105,7 @@ unittest {
 
 /// Add a new node as a child of this node.
 /// Returns: This node, to allow chaining.
-Element add(Ts...)(ref Element parent, Ts args)
+Element addX(Ts...)(ref Element parent, Ts args)
 if (allSatisfy!(isType, Ts)) {
 
     parent ~= args;
@@ -113,7 +113,7 @@ if (allSatisfy!(isType, Ts)) {
 
 }
 
-Element add(Ts...)(Element parent, Ts args)
+Element addX(Ts...)(Element parent, Ts args)
 if (allSatisfy!(isType, Ts)) {
 
     parent ~= args;
@@ -160,20 +160,20 @@ unittest {
 
 unittest {
 
-    assert(elemX!"br" = "<br></br>");
-    assert(elemX!"br " = "<br ></br>");
-    assert(elemX!"br /" = "<br/>");
-    assert(elemX!"br/" = "<br/>");
+    assert(elemX!"br" == "<br></br>");
+    assert(elemX!"br " == "<br ></br >");
+    assert(elemX!"br /" == "<br/>");
+    assert(elemX!"br/" == "<br/>");
 
-    assert(elemX!"myFancyTag" = "<myFancyTag></myFancyTag>");
-    assert(elemX!"myFancyTag /" = "<myFancyTag/>");
-    assert(elemX!"myFancyTäg /" = "<myFancyTäg/>");
+    assert(elemX!"myFancyTag" == "<myFancyTag></myFancyTag>");
+    assert(elemX!"myFancyTag /" == "<myFancyTag/>");
+    assert(elemX!"myFancyTäg /" == "<myFancyTäg/>");
 
-    assert(elemX!"?br" = "<?br ?>");
-    assert(elemX!"!br" = "<!br>");
+    assert(elemX!"?br" == "<?br ?>");
+    assert(elemX!"!br" == "<!br>");
 
-    assert(elemX!"?br" = "<?br ?>");
-    assert(elemX!("?br", "foo") = "<?br foo ?>");
+    assert(elemX!"?br" == "<?br ?>");
+    assert(elemX!("?br", "foo") == "<?br foo ?>");
     assert(elemX!"?br"(attr("foo", "bar")) == `<?br foo="bar" ?>`);
 
 }
