@@ -141,6 +141,7 @@ struct Element {
     pragma(inline, true)
     private void addItem(Type)(Type item) {
 
+        import std.conv;
         import std.range;
         import std.traits;
 
@@ -156,7 +157,7 @@ struct Element {
         // String
         else static if (isSomeString!Type) {
 
-            content ~= directive ? item : escapeHTML(item);
+            content ~= directive ? item.to!string : escapeHTML(item.to!string);
 
         }
 

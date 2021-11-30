@@ -247,3 +247,20 @@ unittest {
     );
 
 }
+
+// UTF-32 test: generally `string` is preferred and in most cases, is required. There's one exception, content, and it
+// must preserve the support.
+//
+// In the future, it might be preferrable to introduce support for any UTF encoding.
+unittest {
+
+    import elemi;
+
+    auto data = cast(dchar[]) "Foo bar"d;
+
+    assert(elem!"div"("Hello, World!"d) == "<div>Hello, World!</div>");
+    assert(elem!"div"(elem!"span"("Hello, World!"d)) == "<div><span>Hello, World!</span></div>");
+    assert(elem!"div"(["class": "foo bar"], "Hello, World!"d) == `<div class="foo bar">Hello, World!</div>`);
+    assert(elem!"p"(data) == `<p>Foo bar</p>`);
+
+}
