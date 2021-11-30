@@ -1,11 +1,14 @@
-
-module elemi;
+module elemi_old;
 
 import std.conv;
 import std.string;
 import std.algorithm;
 
+
 pure @safe:
+
+version (none):
+
 
 /// Escape HTML elements.
 ///
@@ -48,6 +51,23 @@ package string serializeAttributes(string[string] attributes) {
 
 }
 
+/// Process the given content, filtering it to attributes.
+package string processAttributes(T...)(T content) {
+
+    string attrText;
+    static foreach (i, Type; T) {
+
+        static if (is(Type : Attribute)) {
+
+            attrText ~= " " ~ content;
+
+        }
+
+    }
+
+    return attrText;
+
+}
 
 /// Process the given content, sanitizing user input and passing in already created elements.
 package string processContent(T...)(T content)
@@ -65,8 +85,11 @@ package string processContent(T...)(T content, bool escape) {
     string contentText;
     static foreach (i, Type; T) {
 
+        // Given an attribute, ignore it
+        static if (is(Type == Attribute)) { }
+
         // Given a string
-        static if (is(Type == string) || is(Type == wstring) || is(Type == dstring)) {
+        else static if (is(Type == string) || is(Type == wstring) || is(Type == dstring)) {
 
             // Escape it and add
             contentText ~= escape
@@ -129,6 +152,9 @@ struct Element {
         /// If true, this is a preprocessor directive like `<!DOCTYPE>` or `<?xml >`. It's self-closing, and its content
         /// is placed within the tag itself.
         bool directive;
+
+        /// Attribute string of the element.
+        string attrs;
 
         /// HTML of the element.
         string html;
@@ -250,6 +276,7 @@ struct Element {
     /// Add a child
     Element add(T...)(T content) {
 
+
         html ~= content.processContent(!directive);
         return this;
 
@@ -298,6 +325,8 @@ struct Element {
         return this;
 
     }
+
+    alias opOpAssign(string op = "~") = add;
 
     // Yes. This is legal.
     alias toString this;
@@ -409,6 +438,13 @@ unittest {
 
     // Sanitized user input in attributes
     assert(
+        elem!"input"(
+            attr("type") = "text",
+            attr("value") = `"XSS!"`
+        ) == `<input type="text" value="&quot;XSS!&quot;" />`
+    );
+
+    assert(
 
         elem!"input"(["type": "text", "value": `"XSS!"`])
         == `<input type="text" value="&quot;XSS!&quot;" />`
@@ -447,6 +483,17 @@ unittest {
 
     // Significant whitespace
     assert(elem!"span"(" Foo ") == "<span> Foo </span>");
+
+    // Also with tilde
+    auto myElem = elem!"div";
+    myElem ~= elem!"span"("Sample");
+    myElem ~= " ";
+    myElem ~= elem!"span"("Text");
+    myElem ~= attr("class") = "test";
+
+    assert(
+        myElem == `<div class="test"><span>Sample</span> <span>Text</span></div>`
+    );
 
 }
 
@@ -527,6 +574,56 @@ unittest {
 
 }
 
+/// Represents an attribute.
+struct Attribute {
+
+    /// Name of the attribute.
+    string name;
+
+    /// Value assigned to the attribute.
+    string value;
+
+    /// Assign a new value
+    void opAssign(string newValue) {
+
+        value = newValue;
+
+    }
+
+    void opAssign(string[] newValues) {
+
+        value = newValues.join;
+
+    }
+
+    string toString() {
+
+        return format!q{%s="%s"}(name, value.escapeHTML);
+
+    }
+
+}
+
+/// Create an attribute
+Attribute attr(string name) {
+    return Attribute(name);
+}
+
+/// ditto
+Attribute attr(string name)() {
+    return Attribute(name);
+}
+
+
+unittest {
+
+    assert(elem!"div"(
+        attr("id") = "name",
+        attr("class") = ["hello", "world"],
+    ) == `<div id="name" class="hello world"></div>`);
+
+}
+
 // README example
 unittest {
 
@@ -541,9 +638,19 @@ unittest {
         ),
 
         elem!"body"(
+            attr("class") = ["home", "logged-in"],
 
-            // All input is sanitized.
-            "<Welcome to my website!>"
+            elem!"main"(
+
+                elem!"img"(
+                    attr("src") = "/logo.png",
+                    attr("alt") = "Website logo"
+                ),
+
+                // All input is sanitized.
+                "<Welcome to my website!>"
+
+            )
 
         ),
 
