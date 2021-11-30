@@ -17,9 +17,19 @@ auto document = Element.HTMLDoctype ~ elem!"html"(
     ),
 
     elem!"body"(
+        attr("class") = ["home", "logged-in"],
 
-        // All input is sanitized.
-        "<Welcome to my website!>"
+        elem!"main"(
+
+            elem!"img"(
+                attr("src") = "/logo.png",
+                attr("alt") = "Website logo"
+            ),
+
+            // All input is sanitized.
+            "<Welcome to my website!>"
+
+        )
 
     ),
 
