@@ -20,15 +20,17 @@ struct Attribute {
     string value;
 
     /// Assign a new value
-    void opAssign(string newValue) {
+    Attribute opAssign(string newValue) {
 
         value = newValue;
+        return this;
 
     }
 
-    void opAssign(string[] newValues) {
+    Attribute opAssign(string[] newValues) {
 
-        value = newValues.join;
+        value = newValues.join(" ");
+        return this;
 
     }
 
@@ -63,5 +65,16 @@ Attribute attr(string name, string value) {
 Attribute attr(string name)(string value) {
 
     return Attribute(name, value);
+
+}
+
+unittest {
+
+    import elemi.html;
+
+    assert(elem!"div"(
+        attr("id") = "name",
+        attr("class") = ["hello", "world"],
+    ) == `<div id="name" class="hello world"></div>`);
 
 }

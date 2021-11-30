@@ -1,5 +1,9 @@
 module elemi.html;
 
+import std.meta;
+import std.traits;
+
+import elemi.xml;
 import elemi.internal;
 
 public {
@@ -24,11 +28,52 @@ alias elem = elemH;
 ///     attributes = Attributes for the element as an associative array mapping attribute names to their values.
 ///     content = Attributes (via `Attribute` and `attr`), children and text of the element.
 /// Returns: a Element type, implictly castable to string.
-Element elemH(string name, T...)(T args) {
+template elemH(string name, Ts...) {
 
-    enum tag = makeHTMLTag(name);
+    Element elemH(T...)(T args) {
 
-    return elemX!(tag, T)(args);
+        enum tag = makeHTMLTag(name);
+
+        return elemX!(tag, Ts)(args);
+
+    }
+
+}
+
+/// Add a new node as a child of this node.
+/// Returns: This node, to allow chaining.
+Element addH(Ts...)(ref Element parent, Ts args)
+if (allSatisfy!(isType, Ts)) {
+
+    parent ~= args;
+    return parent;
+
+}
+
+Element addH(Ts...)(Element parent, Ts args)
+if (allSatisfy!(isType, Ts)) {
+
+    parent ~= args;
+    return parent;
+
+}
+
+template addH(Ts...)
+if (Ts.length != 0) {
+
+    Element addH(Args...)(ref Element parent, Args args) pure {
+
+        parent ~= elemH!Ts(args);
+        return parent;
+
+    }
+
+    Element addH(Args...)(Element parent, Args args) pure {
+
+        parent ~= elemH!Ts(args);
+        return parent;
+
+    }
 
 }
 

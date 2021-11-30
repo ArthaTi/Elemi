@@ -2,19 +2,16 @@ module elemi.element;
 
 import std.string;
 
-import elemi.xml;
+import elemi;
 import elemi.internal;
 
 
 pure @safe:
 
 
-/// A collection to hold multiple elements next to each other without a wrapper element.
-enum elems = Element();
-
 /// Represents a HTML element.
 ///
-/// Use [elem] to generate.
+/// Use `elem` to generate.
 struct Element {
 
     pure:
@@ -23,7 +20,7 @@ struct Element {
     enum {
 
         /// Doctype info for HTML.
-        HTMLDoctype = elemX!"!DOCTYPE"("html"),
+        HTMLDoctype = elemX!("!DOCTYPE", "html"),
 
         /// XML declaration element. Uses version 1.1.
         XMLDeclaration = elemX!"?xml"(
@@ -32,12 +29,12 @@ struct Element {
         ),
 
         /// Enables UTF-8 encoding for the document
-        EncodingUTF8 = elemX!"meta"(
+        EncodingUTF8 = elemH!"meta"(
             attr!"charset" = "utf-8",
         ),
 
         /// A common head element for adjusting the viewport to mobile devices.
-        MobileViewport = elemX!"meta"(
+        MobileViewport = elemH!"meta"(
             attr!"name" = "viewport",
             attr!"content" = "width=device-width, initial-scale=1"
         ),
@@ -46,6 +43,7 @@ struct Element {
 
     package {
 
+        bool directive;
         string startTag;
         string attributes;
         string trail;
@@ -77,7 +75,8 @@ struct Element {
 
             that.startTag = format!"<%s"(tagName);
             that.trail = " ";
-            that.endTag = "?>";
+            that.endTag = " ?>";
+            that.directive = true;
 
         }
 
@@ -87,6 +86,7 @@ struct Element {
             that.startTag = format!"<%s"(tagName);
             that.trail = " ";
             that.endTag = ">";
+            that.directive = true;
 
         }
 
@@ -99,6 +99,15 @@ struct Element {
         }
 
         return that;
+
+    }
+
+    /// Add trusted XML/HTML code as a child of this node.
+    /// Returns: This node, to allow chaining.
+    Element addTrusted(string code) {
+
+        content ~= code;
+        return this;
 
     }
 
@@ -136,7 +145,7 @@ struct Element {
         // String
         else static if (isSomeString!Type) {
 
-            content ~= escapeHTML(item);
+            content ~= directive ? item : escapeHTML(item);
 
         }
 
@@ -155,22 +164,20 @@ struct Element {
 
     unittest {
 
-        void test(T)(T thing, string expectedResult) {
+        void test(T...)(T things, string expectedResult) {
 
             Element elem;
-            elem.addItem(thing);
-            assert(elem == expectedResult);
+            elem ~= things;
+            assert(elem == expectedResult, format!"wrong result: `%s`"(elem.toString));
 
         }
 
         test(`"Insecure" string`, "&quot;Insecure&quot; string");
         test(Element.make!"div", "<div></div>");
         test(Element.make!"?xml", "<?xml ?>");
+        test(Element.make!"div", `<XSS>`, "<div></div>&lt;XSS&gt;");
 
-        Element outer;
-        outer.addItem(Element.make!"div");
-        outer.addItem(`<XSS>`);
-        test(outer, "<div></div>&lt;XSS&gt;");
+        test(["hello, ", "<XSS>!"], "hello, &lt;XSS&gt;!");
 
     }
 
@@ -178,10 +185,104 @@ struct Element {
 
         import std.conv;
 
+        // Special case: prevent space between trail and endTag in directives
+        if (directive && content == null) {
+
+            return startTag ~ attributes ~ content ~ endTag;
+
+        }
+
         return startTag ~ attributes ~ trail ~ content ~ endTag;
 
     }
 
     alias toString this;
+
+}
+
+/// Creates an element to function as an element collection to place within other elements. This is functionally
+/// equivalent to a regular element, server-side, but is transparent for the rendered document.
+Element elems(T...)(T content) {
+
+    Element element;
+    element ~= content;
+    return element;
+
+}
+
+///
+unittest {
+
+    const collection = elems("Hello, ", elem!"span"("world!"));
+
+    assert(collection == `Hello, <span>world!</span>`);
+    assert(elem!"div"(collection) == `<div>Hello, <span>world!</span></div>`);
+
+}
+
+/// Create an element from trusted HTML/XML code.
+///
+/// Warning: This element cannot have children added after being created. They will be added as siblings instead.
+Element elemTrusted(string code) {
+
+    Element element;
+    element.content = code;
+    return element;
+
+}
+
+///
+unittest {
+
+    assert(elemTrusted("<p>test</p>") == "<p>test</p>");
+    assert(
+        elem!"p"(
+            elemTrusted("<b>foo</b>bar"),
+        ) == "<p><b>foo</b>bar</p>"
+    );
+    assert(
+        elemTrusted("<b>test</b>").add("<b>foo</b>")
+        == "<b>test</b>&lt;b&gt;foo&lt;/b&gt;"
+    );
+
+}
+
+
+// Other related tests
+
+unittest {
+
+    const Element element;
+    assert(element == "");
+    assert(element == elems());
+    assert(element == Element());
+
+    assert(elems("<script>") == "&lt;script&gt;");
+
+}
+
+unittest {
+
+    assert(
+        elem!"p".addTrusted("<b>test</b>")
+        == "<p><b>test</b></p>"
+    );
+
+}
+
+unittest {
+
+    auto foo = ["foo", "<bar>", "test"];
+    auto bar = [
+        elem!"span"("Hello, "),
+        elem!"strong"("World!"),
+    ];
+
+    assert(elem!"div"(foo) == "<div>foo&lt;bar&gt;test</div>");
+    assert(elem!"div"(bar) == "<div><span>Hello, </span><strong>World!</strong></div>");
+
+    assert(elem!"div".add(foo) == "<div>foo&lt;bar&gt;test</div>");
+    assert(elem!"div".addTrusted(foo.join) == "<div>foo<bar>test</div>");
+    assert(elem!"div".add(bar) == "<div><span>Hello, </span><strong>World!</strong></div>");
 
 }

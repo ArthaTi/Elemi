@@ -52,9 +52,13 @@ package string serializeAttributes(string[string] attributes) {
 
 package string minifyAttributes(string attrHTML) {
 
-    return attrHTML.splitter("\n")
+    const ret = attrHTML.splitter("\n")
         .map!q{ a.strip }
         .filter!q{ a.length }
         .join(" ");
+
+    return ret.length
+        ? " " ~ ret
+        : null;
 
 }
