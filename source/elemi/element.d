@@ -23,10 +23,15 @@ struct Element {
         HTMLDoctype = elemX!("!DOCTYPE", "html"),
 
         /// XML declaration element. Uses version 1.1.
-        XMLDeclaration = elemX!"?xml"(
+        XMLDeclaration1_1 = elemX!"?xml"(
             attr!"version" = "1.1",
             attr!"encoding" = "UTF-8",
         ),
+        XMLDeclaration1_0 = elemX!"?xml"(
+            attr!"version" = "1.0",
+            attr!"encoding" = "UTF-8",
+        ),
+        XMLDeclaration = XMLDeclaration1_1,
 
         /// Enables UTF-8 encoding for the document
         EncodingUTF8 = elemH!"meta"(

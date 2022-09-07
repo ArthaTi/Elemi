@@ -199,49 +199,65 @@ unittest {
 unittest {
 
     import elemi;
+    import std.conv;
 
-    auto document = Element.HTMLDoctype ~ elem!"html"(
+    // HTML document
+    auto document = text(
+        Element.HTMLDoctype,
+        elem!"html"(
 
-        elem!"head"(
-            elem!"title"("Hello, World!"),
-            Element.MobileViewport,
-            Element.EncodingUTF8,
-        ),
+            elem!"head"(
+                elem!"title"("Hello, World!"),
+                Element.MobileViewport,
+                Element.EncodingUTF8,
+            ),
 
-        elem!"body"(
-            attr("class") = ["home", "logged-in"],
+            elem!"body"(
+                attr("class") = ["home", "logged-in"],
 
-            elem!"main"(
+                elem!"main"(
 
-                elem!"img"(
-                    attr("src") = "/logo.png",
-                    attr("alt") = "Website logo"
-                ),
+                    elem!"img"(
+                        attr("src") = "/logo.png",
+                        attr("alt") = "Website logo"
+                    ),
 
-                // All input is sanitized.
-                "<Welcome to my website!>"
+                    // All input is sanitized.
+                    "<Welcome to my website!>"
 
-            )
+                )
+
+            ),
 
         ),
 
     );
 
-    auto xml = Element.XMLDeclaration ~ elemX!("feed", `xmlns="http://www.w3.org/2005/Atom"`)(
+    // XML document
+    // You may also `import elemi.xml` if you prefer to type `elem` over `elemX`
+    auto xml = text(
+        Element.XMLDeclaration1_0,
+        elemX!"feed"(
 
-        elemX!"title"("Example feed"),
-        elemX!"subtitle"("Showcasing using elemi for generating XML"),
-        elemX!"updated"("2021-10-30T20:30:00Z"),
+            attr("xmlns") = "http://www.w3.org/2005/Atom",
 
-        elemX!"entry"(
-            elemX!"title"("Elemi home page"),
-            elemX!("link", `href="https://github.com/Soaku/Elemi"`),
+            elemX!"title"("Example feed"),
+            elemX!"subtitle"("Showcasing using elemi for generating XML"),
             elemX!"updated"("2021-10-30T20:30:00Z"),
-            elemX!"summary"("Elemi repository on GitHub"),
-            elemX!"author"(
-                 elemX!"Soaku",
-                 elemX!"soaku@samerion.com"
+
+            elemX!"entry"(
+                elemX!"title"("Elemi home page"),
+                elemX!"link"(
+                    attr("href") = "https://git.samerion.com/Artha/Elemi",
+                ),
+                elemX!"updated"("2021-10-30T20:30:00Z"),
+                elemX!"summary"("Elemi repository on GitHub"),
+                elemX!"author"(
+                     elemX!"Artha",
+                     elemX!"artha@samerion.com"
+                )
             )
+
         )
 
     );

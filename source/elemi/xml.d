@@ -202,6 +202,8 @@ unittest {
     assert(elemX!"?xml"(["version": "1.1"]).addTrusted(`encoding="UTF-8"`)
         == `<?xml version="1.1" encoding="UTF-8" ?>`);
     assert(elemX!"?php" == "<?php ?>");
+    assert(Element.XMLDeclaration1_0 == `<?xml version="1.0" encoding="UTF-8" ?>`);
+    assert(Element.XMLDeclaration1_1 == `<?xml version="1.1" encoding="UTF-8" ?>`);
     assert(elemX!"?php"(`echo "Hello, World!";`) == `<?php echo "Hello, World!"; ?>`);
     assert(elemX!"?="(`"Hello, World!"`) == `<?= "Hello, World!" ?>`);
     // ↑ I will not special-case this to remove spaces.
