@@ -12,10 +12,6 @@ public {
 
 }
 
-
-pure @safe:
-
-
 // Magic elem alias
 alias elem = elemX;
 alias add = addX;
@@ -75,7 +71,7 @@ if (!T.length || (!is(T[0] == typeof(null)) && !is(T[0] == string[string]))) {
 }
 
 ///
-unittest {
+pure @safe unittest {
 
     enum xml = elemX!"xml"(
         elemX!"heading"("This is my sample document!"),
@@ -141,7 +137,7 @@ if (Ts.length != 0) {
 }
 
 ///
-unittest {
+pure @safe unittest {
 
     auto document = elem!"xml"
         .addX!"text"("Hello")
@@ -151,14 +147,14 @@ unittest {
 
 }
 
-unittest {
+pure @safe unittest {
 
     assert(elem!"xml".add("<XSS>") == "<xml>&lt;XSS&gt;</xml>");
     assert(elem!"xml".addX!"span"("<XSS>") == "<xml><span>&lt;XSS&gt;</span></xml>");
 
 }
 
-unittest {
+pure @safe unittest {
 
     assert(elemX!"br" == "<br></br>");
     assert(elemX!"br " == "<br ></br >");
@@ -179,13 +175,13 @@ unittest {
 }
 
 // Issue #1
-unittest {
+pure @safe unittest {
 
     enum Foo = elem!("p")("<unsafe>code</unsafe>");
 
 }
 
-unittest {
+pure @safe unittest {
 
     assert(elemX!"p" == "<p></p>");
     assert(elemX!"p /" == "<p/>");

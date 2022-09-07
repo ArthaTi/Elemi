@@ -68,7 +68,7 @@ Attribute attr(string name)(string value) {
 
 }
 
-unittest {
+pure unittest {
 
     import elemi.html;
 

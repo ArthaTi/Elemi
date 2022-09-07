@@ -14,7 +14,7 @@ alias add = elemi.html.add;
 
 
 ///
-unittest {
+pure @safe unittest {
 
     // Compile-time empty type detection
     assert(elem!"input" == "<input/>");
@@ -119,8 +119,7 @@ unittest {
 }
 
 /// A general example page
-@system
-unittest {
+pure @system unittest {
 
     import std.stdio : writeln;
     import std.base64 : Base64;
@@ -196,7 +195,7 @@ unittest {
 }
 
 // README example
-unittest {
+pure @safe unittest {
 
     import elemi;
     import std.conv;
@@ -234,7 +233,7 @@ unittest {
     );
 
     // XML document
-    // You may also `import elemi.xml` if you prefer to type `elem` over `elemX`
+    // You may `import elemi.xml` if you prefer to type `elem` over `elemX`
     auto xml = text(
         Element.XMLDeclaration1_0,
         elemX!"feed"(
@@ -268,15 +267,17 @@ unittest {
 // must preserve the support.
 //
 // In the future, it might be preferrable to introduce support for any UTF encoding.
-unittest {
+pure @safe unittest {
 
     import elemi;
 
-    auto data = cast(dchar[]) "Foo bar"d;
+    auto data = "Foo bar"d;
+    dchar[] dataArr = "Foo bar"d.dup;
 
     assert(elem!"div"("Hello, World!"d) == "<div>Hello, World!</div>");
     assert(elem!"div"(elem!"span"("Hello, World!"d)) == "<div><span>Hello, World!</span></div>");
     assert(elem!"div"(["class": "foo bar"], "Hello, World!"d) == `<div class="foo bar">Hello, World!</div>`);
     assert(elem!"p"(data) == `<p>Foo bar</p>`);
+    assert(elem!"p"(dataArr) == `<p>Foo bar</p>`);
 
 }

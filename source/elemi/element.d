@@ -5,16 +5,10 @@ import std.string;
 import elemi;
 import elemi.internal;
 
-
-pure @safe:
-
-
 /// Represents a HTML element.
 ///
 /// Use `elem` to generate.
 struct Element {
-
-    pure:
 
     // Commonly used elements
     enum {
@@ -58,7 +52,7 @@ struct Element {
     }
 
     /// Create the tag.
-    static package Element make(string tagName)()
+    static package Element make(string tagName)() pure @safe
     in(tagName.length != 0, "Tag name cannot be empty")
     do {
 
@@ -108,7 +102,7 @@ struct Element {
     }
 
     /// Check if the element allows content.
-    bool acceptsContent() const {
+    bool acceptsContent() const pure @safe {
 
         return endTag.length || !startTag.length;
 
@@ -116,7 +110,7 @@ struct Element {
 
     /// Add trusted XML/HTML code as a child of this node.
     /// Returns: This node, to allow chaining.
-    Element addTrusted(string code) {
+    Element addTrusted(string code) pure @safe {
 
         assert(acceptsContent, "This element doesn't accept content");
 
@@ -136,14 +130,12 @@ struct Element {
 
     }
 
-    pragma(inline, true)
-    private void addItem(Attribute item) {
+    private void addItem(Attribute item) pure @safe {
 
         attributes ~= " " ~ item;
 
     }
 
-    pragma(inline, true)
     private void addItem(Type)(Type item) {
 
         import std.conv;
@@ -179,7 +171,7 @@ struct Element {
 
     }
 
-    unittest {
+    pure @safe unittest {
 
         void test(T...)(T things, string expectedResult) {
 
@@ -198,7 +190,7 @@ struct Element {
 
     }
 
-    string toString() const {
+    string toString() const pure @safe {
 
         import std.conv;
 
@@ -228,7 +220,7 @@ Element elems(T...)(T content) {
 }
 
 ///
-unittest {
+pure @safe unittest {
 
     const collection = elems("Hello, ", elem!"span"("world!"));
 
@@ -240,7 +232,7 @@ unittest {
 /// Create an element from trusted HTML/XML code.
 ///
 /// Warning: This element cannot have children added after being created. They will be added as siblings instead.
-Element elemTrusted(string code) {
+Element elemTrusted(string code) pure @safe {
 
     Element element;
     element.content = code;
@@ -249,7 +241,7 @@ Element elemTrusted(string code) {
 }
 
 ///
-unittest {
+pure @safe unittest {
 
     assert(elemTrusted("<p>test</p>") == "<p>test</p>");
     assert(
@@ -267,7 +259,7 @@ unittest {
 
 // Other related tests
 
-unittest {
+pure @safe unittest {
 
     const Element element;
     assert(element == "");
@@ -278,7 +270,7 @@ unittest {
 
 }
 
-unittest {
+pure @safe unittest {
 
     assert(
         elem!"p".addTrusted("<b>test</b>")
@@ -287,7 +279,7 @@ unittest {
 
 }
 
-unittest {
+pure @safe unittest {
 
     auto foo = ["foo", "<bar>", "test"];
     auto bar = [

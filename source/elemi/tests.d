@@ -4,7 +4,7 @@ module elemi.tests;
 // Of course, in practice, you should never mix elemH and elemX in the same document. We do this here to simplify the
 // tests.
 
-unittest {
+pure @safe unittest {
 
     import elemi.xml;
     import elemi.html : elemH, addH;
@@ -21,7 +21,7 @@ unittest {
 
 }
 
-unittest {
+pure @safe unittest {
 
     import elemi.html;
 
@@ -35,7 +35,7 @@ unittest {
 
 }
 
-unittest {
+pure @safe unittest {
 
     import elemi;
 
@@ -47,5 +47,79 @@ unittest {
         )
         == "<div><br/><br>I don&#39;t care about HTML limitations!</br><div/></div>"
     );
+
+}
+
+// Impure ranges
+version (unittest) int impure;
+@safe unittest {
+
+    import elemi;
+    import std.conv, std.range, std.algorithm;
+
+    auto range = [1, 2, 3]
+        .tee!(item => impure += item)
+        .map!(item => elem!"number"(item.to!string));
+
+    assert(elemH!"list"(range) == "<list><number>1</number><number>2</number><number>3</number></list>");
+    assert(elemX!"list"(range) == elemH!"list"(range));
+    assert(impure == 6*3);
+
+    bool ran;
+
+    () pure {
+
+        assert(!__traits(compiles, elem!"list"(range)));
+        assert( __traits(compiles, elem!"list"("1")));
+
+        assert(!__traits(compiles, elemX!"list"(range)));
+        assert( __traits(compiles, elemX!"list"("1")));
+
+        ran = true;
+
+    }();
+
+    // Just to make sure
+    assert(ran);
+
+}
+
+// @system ranges
+@system unittest {
+
+    import elemi;
+    import std.conv, std.range, std.algorithm;
+
+    int value;
+
+    void increment() @system {
+
+        value++;
+
+    }
+
+    auto range = [1, 2, 3]
+        .tee!(item => increment)
+        .map!(item => elem!"number"(item.to!string));
+
+    assert(elemH!"list"(range) == "<list><number>1</number><number>2</number><number>3</number></list>");
+    assert(elemX!"list"(range) == elemH!"list"(range));
+    assert(value == 3*3);
+
+    bool ran;
+
+    () @safe {
+
+        assert(!__traits(compiles, elem!"list"(range)));
+        assert( __traits(compiles, elem!"list"("1")));
+
+        assert(!__traits(compiles, elemX!"list"(range)));
+        assert( __traits(compiles, elemX!"list"("1")));
+
+        ran = true;
+
+    }();
+
+    assert(ran);
 
 }

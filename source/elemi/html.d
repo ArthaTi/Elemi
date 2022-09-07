@@ -13,10 +13,6 @@ public {
 
 }
 
-
-pure @safe:
-
-
 // Magic elem alias
 alias elem = elemH;
 alias add = addH;
@@ -62,14 +58,14 @@ if (allSatisfy!(isType, Ts)) {
 template addH(Ts...)
 if (Ts.length != 0) {
 
-    Element addH(Args...)(ref Element parent, Args args) pure {
+    Element addH(Args...)(ref Element parent, Args args) {
 
         parent ~= elemH!Ts(args);
         return parent;
 
     }
 
-    Element addH(Args...)(Element parent, Args args) pure {
+    Element addH(Args...)(Element parent, Args args) {
 
         parent ~= elemH!Ts(args);
         return parent;
@@ -79,7 +75,7 @@ if (Ts.length != 0) {
 }
 
 /// Check if the given tag is a HTML5 self-closing tag.
-bool isVoidTag(string tag) {
+bool isVoidTag(string tag) pure @safe {
 
     switch (tag) {
 
@@ -99,7 +95,7 @@ bool isVoidTag(string tag) {
 }
 
 /// If the given tag is a void tag, make it a self-closing.
-private string makeHTMLTag(string tag) {
+private string makeHTMLTag(string tag) pure @safe {
 
     assert(tag.length && tag[$-1] != '/', "Self-closing tags are applied automatically when working with html, please"
         ~ " remove the slash.");
