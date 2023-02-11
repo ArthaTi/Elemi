@@ -17,11 +17,15 @@ package string escapeHTML(const string text) {
     if (__ctfe) {
 
         return text
-            .replace(`<`, "&lt;")
-            .replace(`>`, "&gt;")
-            .replace(`&`, "&amp;")
-            .replace(`"`, "&quot;")
-            .replace(`'`, "&#39;");
+            .map!(ch => ch.predSwitch(
+                '<', "&lt;",
+                '>', "&gt;",
+                '&', "&amp;",
+                '"', "&quot;",
+                '\'', "&#39;",
+                .text(ch),
+            ))
+            .join;
 
     }
 

@@ -123,3 +123,14 @@ version (unittest) int impure;
     assert(ran);
 
 }
+
+/// CTFE usage
+unittest {
+
+    import elemi;
+
+    enum document = elem!"p"("<stuff>");
+
+    assert(cast(string) document == cast(string) elem!"p"("<stuff>"));
+
+}
