@@ -142,11 +142,10 @@ struct Element {
         import std.range;
         import std.traits;
 
-        assert(acceptsContent, "This element doesn't accept content");
-
         // Element
         static if (is(Type : Element)) {
 
+            assert(acceptsContent, "This element doesn't accept content");
             content ~= item;
 
         }
@@ -154,6 +153,7 @@ struct Element {
         // String
         else static if (isSomeString!Type) {
 
+            assert(acceptsContent, "This element doesn't accept content");
             content ~= directive ? item.to!string : escapeHTML(item.to!string);
 
         }
@@ -293,5 +293,19 @@ pure @safe unittest {
     assert(elem!"div".add(foo) == "<div>foo&lt;bar&gt;test</div>");
     assert(elem!"div".addTrusted(foo.join) == "<div>foo<bar>test</div>");
     assert(elem!"div".add(bar) == "<div><span>Hello, </span><strong>World!</strong></div>");
+
+}
+
+pure @safe unittest {
+
+    auto attributes = [
+        attr("rel") = "me",
+        attr("href") = "https://samerion.com",
+    ];
+
+    assert(elem!"meta"(
+        attributes,
+        attr("x") = "woo",
+    ) == `<meta rel="me" href="https://samerion.com" x="woo"/>`);
 
 }
