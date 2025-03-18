@@ -5,6 +5,14 @@ import std.string;
 import elemi;
 import elemi.internal;
 
+static if (__traits(compiles, { import core.interpolation; })) {
+    import core.interpolation;
+    enum withInterpolation = true;
+}
+else {
+    enum withInterpolation = false;
+}
+
 /// Represents a HTML element.
 ///
 /// Use `elem` to generate.
@@ -121,24 +129,50 @@ struct Element {
 
     void opOpAssign(string op = "~", Ts...)(Ts args) {
 
+        import std.meta;
+
+        // Interpolate arguments
+        static if (withInterpolation) {
+
+            template inString(size_t index) {
+                static if (is(Ts[index] == InterpolationHeader))
+                    enum inString = true;
+                else static if (is(Ts[index] == InterpolationFooter))
+                    enum inString = false;
+                else static if (index == 0)
+                    enum inString = false;
+                else
+                    enum inString = inString!(index - 1);
+            }
+
+            static foreach (i, Type; Ts) {
+                static if (!is(Type == InterpolationFooter)) {
+                    addItem!(inString!i)(args[i]);
+                }
+            }
+        }
+
         // Check each argument
-        static foreach (i, Type; Ts) {
-
-            addItem(args[i]);
-
+        else {
+            static foreach (i, Type; Ts) {
+                addItem(args[i]);
+            }
         }
 
     }
 
-    private void addItem(Attribute item) pure @safe {
+    @safe unittest {
+        assert(elem!"p"(i"Hello, $(123)!", " ... ", i"Hello, $(123)!") ==
+            "<p>Hello, 123! ... Hello, 123!</p>");
+        assert(!__traits(compiles, elem!"p"(123)));
+        assert(!__traits(compiles, elem!"p"(i"Hello ", 123)));
 
-        attributes ~= " " ~ item;
-
+        assert(elem!"p"(i"Hello, $(elem!"b"("Woo!"))~") ==
+            "<p>Hello, <b>Woo!</b>~</p>");
     }
 
-    private void addItem(Type)(Type item) {
+    private void addItem(bool allowInterpolation = false, Type)(Type item) {
 
-        import std.conv;
         import std.range;
         import std.traits;
 
@@ -150,11 +184,17 @@ struct Element {
 
         }
 
+        // Attribute
+        else static if (is(Type : Attribute)) {
+
+            attributes ~= " " ~ item;
+
+        }
+
         // String
         else static if (isSomeString!Type) {
 
-            assert(acceptsContent, "This element doesn't accept content");
-            content ~= directive ? item.to!string : escapeHTML(item.to!string);
+            addText(item);
 
         }
 
@@ -166,8 +206,24 @@ struct Element {
 
         }
 
+        // Perform interpolation
+        else static if (allowInterpolation) {
+
+            addText(item);
+
+        }
+
         // No idea what is this
         else static assert(false, "Unsupported element type " ~ fullyQualifiedName!Type);
+
+    }
+
+    private void addText(T)(T item) {
+
+        import std.conv;
+
+        assert(acceptsContent, "This element doesn't accept content");
+        content ~= directive ? item.to!string : escapeHTML(item.to!string);
 
     }
 
