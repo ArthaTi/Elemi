@@ -199,7 +199,7 @@ struct Element {
         }
 
         // Range
-        else static if (isInputRange!Type) {
+        else static if (isInputRange!Type && __traits(compiles, addItem(item.front))) {
 
             // TODO Needs tests
             foreach (content; item) addItem(content);
