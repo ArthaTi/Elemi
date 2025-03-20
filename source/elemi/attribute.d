@@ -4,6 +4,13 @@ import std.string;
 
 import elemi.internal;
 
+static if (__traits(compiles, { import core.interpolation; })) {
+    import core.interpolation;
+    enum withInterpolation = true;
+}
+else {
+    enum withInterpolation = false;
+}
 
 pure @safe:
 
@@ -32,6 +39,14 @@ struct Attribute {
         value = newValues.join(" ");
         return this;
 
+    }
+
+    static if (withInterpolation) {
+        Attribute opAssign(Ts...)(InterpolationHeader, Ts values, InterpolationFooter) {
+            import std.conv : text;
+            value = text(values);
+            return this;
+        }
     }
 
     string toString() {
@@ -76,5 +91,15 @@ pure unittest {
         attr("id") = "name",
         attr("class") = ["hello", "world"],
     ) == `<div id="name" class="hello world"></div>`);
+
+}
+
+pure unittest {
+
+    import elemi.html;
+
+    assert(elem!"div"(
+        attr("class") = i"interpolate-$(123)-<unsafe>"
+    ) == `<div class="interpolate-123-&lt;unsafe&gt;"></div>`);
 
 }
