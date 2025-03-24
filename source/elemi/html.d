@@ -14,6 +14,10 @@ public {
 
 }
 
+static if (withInterpolation) {
+    import core.interpolation;
+}
+
 // Magic elem alias
 alias elem = elemH;
 alias add = addH;
@@ -128,11 +132,17 @@ struct HTMLTag(string name) {
 /// Add an `id` attribute to an HTML tag.
 /// Params:
 ///     tag   = Tag builder for the target tag.
-///     value = Value to use for the attribute.
+///     value = Value to use for the attribute. Supports istrings.
 /// Returns:
 ///     A tag builder.
 Tag id(string name)(HTMLTag!name tag, string value) @safe {
     return tag.attr("id", value);
+}
+
+static if (withInterpolation) {
+    Tag id(string name, Ts...)(HTMLTag!name tag, InterpolationHeader header, Ts value) @safe {
+        return tag.attr("id", header, value);
+    }
 }
 
 /// Add a `class` attribute to a HTML tag.
@@ -154,12 +164,19 @@ Tag classes(string name)(HTMLTag!name tag, string[] values...) @safe {
 
 /// Set the "href" attribute for an `<a>` element.
 /// Params:
-///     tag    = Tag builder for the target tag.
-///     value = Value to use for the attribute.
+///     tag   = Tag builder for the target tag.
+///     value = Value to use for the attribute. Supports istrings.
 /// Returns:
 ///     A tag builder.
 Tag href(HTMLTag!"a" tag, string value) @safe {
     return tag.attr("href", value);
+}
+
+static if (withInterpolation) {
+    /// ditto
+    Tag href(Ts...)(HTMLTag!"a" tag, InterpolationHeader header, Ts value) @safe {
+        return tag.attr("href", header, value);
+    }
 }
 
 /// A set of HTML tags to build documents with.

@@ -11,6 +11,10 @@ import elemi.html;
 import elemi.element;
 import elemi.attribute;
 
+static if (withInterpolation) {
+    import core.interpolation;
+}
+
 /// Elements are created using a tilde, followed by curly braces. This syntax is called an
 /// **element block**.
 @safe unittest {
@@ -82,6 +86,23 @@ import elemi.attribute;
     assert(output == `&lt;script&gt;alert(&#39;fool!&#39;)&lt;/script&gt;`
         ~ `<input value="&quot; can&#39;t quit me"/>`
         ~ `<div class="classes are &lt;no exception&gt;"></div>`);
+}
+
+static if (withInterpolation) {
+    /// Interpolated expression strings, aka istrings, are supported.
+    unittest {
+        string output = buildDocument() ~ {
+            const user = "<user>";
+            HTML ~ i"Hello $(user)";
+            HTML.div ~ i"Hello $(user)";
+            HTML.div.attr("name", i"$(user)") ~ { };
+            HTML.a.href(i"https://example.com/$(user)") ~ { };
+        };
+        assert(output == `Hello &lt;user&gt;`
+            ~ `<div>Hello &lt;user&gt;</div>`
+            ~ `<div name="&lt;user&gt;"></div>`
+            ~ `<a href="https://example.com/&lt;user&gt;"></a>`);
+    }
 }
 
 /// To reduce verbosity, you can use the [`with`
@@ -232,13 +253,13 @@ struct Tag {
     /// Returns:
     ///     The same tag, but marked using [withAttributes]. This should be used to return from
     ///     attribute-adding methods.
-    Tag attributed() const {
+    Tag attributed() const @safe {
         return Tag(tagName, isSelfClosing, true);
     }
 
     /// Returns:
     ///     This tag, but edited to be self-closing.
-    Tag makeSelfClosing() const {
+    Tag makeSelfClosing() const @safe {
         return Tag(tagName, true, withAttributes);
     }
 
@@ -255,6 +276,15 @@ struct Tag {
         }
     }
 
+    static if (withInterpolation)
+    void opBinary(string op : "~", Ts...)(InterpolationHeader, Ts text) {
+        begin();
+        if (!isSelfClosing) {
+            pushElementText(text);
+            end();
+        }
+    }
+
     void opBinary(string op : "~")(void delegate() @safe builder) @safe {
         begin();
         if (!isSelfClosing) {
@@ -263,7 +293,7 @@ struct Tag {
         }
     }
 
-    void opBinary(string op : "~")(void delegate() @system builder) @system{
+    void opBinary(string op : "~")(void delegate() @system builder) @system {
         begin();
         if (!isSelfClosing) {
             builder();
@@ -274,11 +304,24 @@ struct Tag {
     /// Add an attribute to the element.
     /// Params:
     ///     name  = Name of the attribute.
-    ///     value = Value for the attribute.
+    ///     value = Value for the attribute. Supports istrings.
     /// Returns:
     ///     Tag builder.
     Tag attr(string name, string value) @safe {
         return attr(Attribute(name, value));
+    }
+
+    /// ditto
+    static if (withInterpolation) {
+        Tag attr(Ts...)(string name, InterpolationHeader, Ts value) @safe {
+            beginAttributes();
+            pushElementMarkup(" ");
+            pushElementMarkup(name);
+            pushElementMarkup(`="`);
+            pushElementText(value);
+            pushElementMarkup(`"`);
+            return attributed;
+        }
     }
 
     /// Add a prepared set of attributes to the element.
@@ -335,6 +378,9 @@ struct Tag {
 /// i.e. ("<b>Hi</b>")` will include unescaped HTML code.
 ///
 /// If escaping is desired, try [pushElementText].
+///
+/// Params:
+///     content = Markup to output.
 void pushElementMarkup(string content) @safe {
     assert(elementOutput,
         "No Elemi context is currently active. Try prepending the document with "
@@ -343,6 +389,8 @@ void pushElementMarkup(string content) @safe {
 }
 
 /// Low-level function to write escaped text.
+/// Params:
+///     content = Content to write. Interpolated expression strings (istrings) are supported.
 void pushElementText(string content) {
     while (!content.empty) {
         const nextMarkup = content.indexOfAny(`<>&"'`);
@@ -363,13 +411,48 @@ void pushElementText(string content) {
     }
 }
 
+/// ditto
+void pushElementText(Ts...)(Ts content) {
+
+    import std.format.write;
+
+    auto writer = EscapingElementWriter();
+
+    foreach (item; content) {
+        formattedWrite!"%s"(writer, item);
+    }
+
+}
+
+/// This output range writes escapes the text it writes.
+struct EscapingElementWriter {
+
+    void put(char content) {
+        if (auto escaped = escapeHTMLCharacter(content)) {
+            pushElementMarkup(escaped);
+        }
+        else {
+            immutable(char)[1] c = content;
+            pushElementMarkup(c[]);
+        }
+    }
+
+    void put(string content) {
+        pushElementText(content);
+    }
+
+}
+
 /// Escape an ASCII character using HTML escape codes.
+/// Returns:
+///     A corresponding HTML escape code, or null if there isn't one.
 private string escapeHTMLCharacter(char ch) {
-    final switch (ch) {
+    switch (ch) {
         case '<':  return "&lt;";
         case '>':  return "&gt;";
         case '&':  return "&amp;";
         case '"':  return "&quot;";
         case '\'': return "&#39;";
+        default:   return null;
     }
 }
