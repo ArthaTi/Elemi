@@ -5,6 +5,7 @@ public {
     import elemi.xml;
     import elemi.html;
     import elemi.element;
+    import elemi.generator;
     import elemi.attribute;
 
 }
