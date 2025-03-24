@@ -14,10 +14,6 @@ public {
 
 }
 
-static if (withInterpolation) {
-    import core.interpolation;
-}
-
 // Magic elem alias
 alias elem = elemH;
 alias add = addH;

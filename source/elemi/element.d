@@ -5,14 +5,6 @@ import std.string;
 import elemi;
 import elemi.internal;
 
-static if (__traits(compiles, { import core.interpolation; })) {
-    import core.interpolation;
-    enum withInterpolation = true;
-}
-else {
-    enum withInterpolation = false;
-}
-
 /// Represents a HTML element.
 ///
 /// Use `elem` to generate.

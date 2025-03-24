@@ -9,11 +9,8 @@ import std.functional;
 
 import elemi.html;
 import elemi.element;
+import elemi.internal;
 import elemi.attribute;
-
-static if (withInterpolation) {
-    import core.interpolation;
-}
 
 /// Elements are created using a tilde, followed by curly braces. This syntax is called an
 /// **element block**.
