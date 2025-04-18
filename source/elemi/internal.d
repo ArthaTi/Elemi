@@ -4,9 +4,15 @@ import std.conv;
 import std.string;
 import std.algorithm;
 
-
 pure @safe:
 
+static if (__traits(compiles, { import core.interpolation; })) {
+    public import core.interpolation;
+    enum withInterpolation = true;
+}
+else {
+    enum withInterpolation = false;
+}
 
 /// Escape HTML elements.
 ///
