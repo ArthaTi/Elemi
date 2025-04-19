@@ -7,6 +7,7 @@ public {
     import elemi.element;
     import elemi.generator;
     import elemi.attribute;
+    import elemi.wrapper;
 
 }
 

@@ -2,16 +2,6 @@
 /// including control flow.
 module elemi.generator;
 
-import std.meta;
-import std.range;
-import std.string;
-import std.functional;
-
-import elemi.html;
-import elemi.element;
-import elemi.internal;
-import elemi.attribute;
-
 /// Elements are created using a tilde, followed by curly braces. This syntax is called an
 /// **element block**.
 @safe unittest {
@@ -130,6 +120,16 @@ static if (withInterpolation) {
     }
 }
 
+import std.meta;
+import std.range;
+import std.string;
+import std.functional;
+
+import elemi.html;
+import elemi.element;
+import elemi.internal;
+import elemi.attribute;
+
 static if (__traits(compiles, { import core.attribute : mustuse; })) {
     import core.attribute : mustuse;
 }
@@ -183,13 +183,13 @@ DocumentBuilder!() buildDocument() @safe {
 @mustuse
 struct DocumentBuilder(alias fun) {
 
-    void opBinary(string op : "~")(void delegate() @safe build) {
+    void opBinary(string op : "~")(void delegate() @safe build) @safe {
         elementOutput = (string fragment) => unaryFun!fun(fragment);
         scope (exit) elementOutput = null;
         build();
     }
 
-    void opBinary(string op : "~")(void delegate() @system build) {
+    void opBinary(string op : "~")(void delegate() @system build) @system {
         elementOutput = (string fragment) => unaryFun!fun(fragment);
         scope (exit) elementOutput = null;
         build();
@@ -212,7 +212,7 @@ struct DocumentBuilder() {
         return elemTrusted(output[]);
     }
 
-    Element opBinary(string op : "~")(void delegate() @system build) @safe {
+    Element opBinary(string op : "~")(void delegate() @system build) @system {
         Appender!string output;
         elementOutput = (string fragment) => output ~= fragment;
         scope (exit) elementOutput = null;
