@@ -123,6 +123,16 @@ struct HTMLTag(string name) {
 
     auto tag = Tag(name, isVoidTag);
     alias tag this;
+
+    HTMLTag attr(Ts...)(Ts args) {
+        return HTMLTag(
+            tag.attr(args));
+    }
+
+    HTMLTag attributed(Ts...)(Ts args) {
+        return HTMLTag(
+            tag.attributed(args));
+    }
 }
 
 /// Add an `id` attribute to an HTML tag.
@@ -147,7 +157,7 @@ static if (withInterpolation) {
 ///     values = Classes to write.
 /// Returns:
 ///     A tag builder.
-Tag classes(string name)(HTMLTag!name tag, string[] values...) @safe {
+HTMLTag!name classes(string name)(HTMLTag!name tag, string[] values...) @safe {
     tag.beginAttributes();
     pushElementMarkup(` class="`);
     foreach (i, value; values) {
@@ -164,7 +174,7 @@ Tag classes(string name)(HTMLTag!name tag, string[] values...) @safe {
 ///     value = Value to use for the attribute. Supports istrings.
 /// Returns:
 ///     A tag builder.
-Tag href(HTMLTag!"a" tag, string value) @safe {
+HTMLTag!"a" href(HTMLTag!"a" tag, string value) @safe {
     return tag.attr("href", value);
 }
 

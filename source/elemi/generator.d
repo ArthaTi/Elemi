@@ -84,11 +84,15 @@ static if (withInterpolation) {
             HTML.div ~ i"Hello $(user)";
             HTML.div.attr("name", i"$(user)") ~ { };
             HTML.a.href(i"https://example.com/$(user)") ~ { };
+            HTML.a
+                .classes("button", "special")
+                .href("https://example.com/") ~ { };
         };
         assert(output == `Hello &lt;user&gt;`
             ~ `<div>Hello &lt;user&gt;</div>`
             ~ `<div name="&lt;user&gt;"></div>`
-            ~ `<a href="https://example.com/&lt;user&gt;"></a>`);
+            ~ `<a href="https://example.com/&lt;user&gt;"></a>`
+            ~ `<a class="button special" href="https://example.com/"></a>`);
     }
 }
 
