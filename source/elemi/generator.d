@@ -112,18 +112,6 @@ static if (withInterpolation) {
 
 }
 
-/// To reduce verbosity, you can use the [`with`
-/// statement](https://dlang.org/spec/statement.html#WithStatement).
-@safe unittest {
-    string output = buildHTML() ~ (html) {
-        with (html) {
-            div.id("my-div") ~ {
-                p ~ "Hello, World!";
-            };
-        }
-    };
-}
-
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html ~ elem!"p"("Hello, World!");
@@ -214,19 +202,24 @@ struct TextDocumentBuilder {
 @mustuse
 struct Tag {
 
+    /// Output target for this tag; HTML code will be written to this destination.
+    DocumentOutput output;
+
     /// Name of this HTML tag.
     string tagName;
 
     /// If true, this is a "self-closing" tag. No child nodes or text can be added.
     bool isSelfClosing;
 
+    alias output this;
+
     /// The tag can be marked as self-closing so it does not generate content nor an end tag.
     unittest {
-        auto normal = buildDocument() ~ {
-            Tag("a") ~ { };
+        auto normal = buildHTML() ~ (html) {
+            Tag(html, "a") ~ { };
         };
-        auto selfClosing = buildDocument() ~ {
-            Tag("a").makeSelfClosing() ~ { };
+        auto selfClosing = buildHTML() ~ (html) {
+            Tag(html, "a").makeSelfClosing() ~ { };
         };
 
         assert(normal == "<a></a>");
@@ -234,11 +227,11 @@ struct Tag {
     }
 
     unittest {
-        auto normal = buildDocument() ~ {
-            Tag("a").attr("k", "k") ~ { };
+        auto normal = buildHTML() ~ (html) {
+            Tag(html, "a").attr("k", "k") ~ { };
         };
-        auto selfClosing = buildDocument() ~ {
-            Tag("a").attr("k", "k").makeSelfClosing() ~ { };
+        auto selfClosing = buildHTML() ~ (html) {
+            Tag(html, "a").attr("k", "k").makeSelfClosing() ~ { };
         };
 
         assert(normal == `<a k="k"></a>`);
@@ -255,13 +248,13 @@ struct Tag {
     ///     The same tag, but marked using [withAttributes]. This should be used to return from
     ///     attribute-adding methods.
     Tag attributed() const @safe {
-        return Tag(tagName, isSelfClosing, true);
+        return Tag(output, tagName, isSelfClosing, true);
     }
 
     /// Returns:
     ///     This tag, but edited to be self-closing.
     Tag makeSelfClosing() const @safe {
-        return Tag(tagName, true, withAttributes);
+        return Tag(output, tagName, true, withAttributes);
     }
 
     void opBinary(string op : "~")(typeof(null)) @safe {
@@ -384,12 +377,18 @@ struct DocumentOutput {
 
     void delegate(string fragment) @safe elementOutput;
 
-    void opBinary(string op : "~")(string rhs) const @safe {
-        pushElementText(rhs);
+    void opBinary(string op : "~", T : string)(T rhs) @safe {
+        static if (is(T : const Element)) {
+            pushElementMarkup(rhs);
+        }
+        else {
+            pushElementText(rhs);
+        }
     }
 
-    void opBinary(string op : "~")(const Element rhs) const @safe {
-        pushElementMarkup(rhs);
+    static if (withInterpolation)
+    void opBinary(string op : "~", Ts...)(InterpolationHeader, Ts text) {
+        pushElementText(text);
     }
 
     /// Low-level function to write elements into current document context. Raw markup can be used,
@@ -429,41 +428,43 @@ struct DocumentOutput {
         }
     }
 
-}
+    /// ditto
+    void pushElementText(Ts...)(Ts content) {
 
-/// ditto
-void pushElementText(Ts...)(Ts content) {
+        import std.format.write;
 
-    import std.format.write;
+        auto writer = EscapingElementWriter(this);
 
-    auto writer = EscapingElementWriter();
-
-    foreach (item; content) {
-        static if (is(typeof(item) : Element)) {
-            pushElementMarkup(item);
+        foreach (item; content) {
+            static if (is(typeof(item) : Element)) {
+                pushElementMarkup(item);
+            }
+            else {
+                formattedWrite!"%s"(writer, item);
+            }
         }
-        else {
-            formattedWrite!"%s"(writer, item);
-        }
+
     }
 
-}
+    /// This output range writes escapes the text it writes.
+    private struct EscapingElementWriter {
 
-/// This output range writes escapes the text it writes.
-struct EscapingElementWriter {
+        DocumentOutput output;
 
-    void put(char content) {
-        if (auto escaped = escapeHTMLCharacter(content)) {
-            pushElementMarkup(escaped);
+        void put(char content) {
+            if (auto escaped = escapeHTMLCharacter(content)) {
+                output.pushElementMarkup(escaped);
+            }
+            else {
+                immutable(char)[1] c = content;
+                output.pushElementMarkup(c[]);
+            }
         }
-        else {
-            immutable(char)[1] c = content;
-            pushElementMarkup(c[]);
-        }
-    }
 
-    void put(string content) {
-        pushElementText(content);
+        void put(string content) {
+            output.pushElementText(content);
+        }
+
     }
 
 }

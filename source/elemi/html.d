@@ -1,6 +1,7 @@
 module elemi.html;
 
 import std.meta;
+import std.range;
 import std.traits;
 
 import elemi.xml;
@@ -121,8 +122,16 @@ struct HTMLTag(string name) {
         || name == "track"
         || name == "wbr";
 
-    auto tag = Tag(name, isVoidTag);
+    Tag tag;
     alias tag this;
+
+    this(DocumentOutput output) {
+        this.tag = Tag(output, name, isVoidTag);
+    }
+
+    this(Tag tag) {
+        this.tag = tag;
+    }
 
     HTMLTag attr(Ts...)(Ts args) {
         return HTMLTag(
@@ -133,56 +142,54 @@ struct HTMLTag(string name) {
         return HTMLTag(
             tag.attributed(args));
     }
-}
 
-/// Add an `id` attribute to an HTML tag.
-/// Params:
-///     tag   = Tag builder for the target tag.
-///     value = Value to use for the attribute. Supports istrings.
-/// Returns:
-///     A tag builder.
-Tag id(string name)(HTMLTag!name tag, string value) @safe {
-    return tag.attr("id", value);
-}
-
-static if (withInterpolation) {
-    Tag id(string name, Ts...)(HTMLTag!name tag, InterpolationHeader header, Ts value) @safe {
-        return tag.attr("id", header, value);
+    /// Add an `id` attribute to the HTML tag.
+    /// Params:
+    ///     value = Value to use for the attribute. Supports istrings.
+    /// Returns:
+    ///     A tag builder.
+    HTMLTag id(string value) @safe {
+        return attr("id", value);
     }
-}
 
-/// Add a `class` attribute to a HTML tag.
-/// Params:
-///     tag    = Tag builder for the target tag.
-///     values = Classes to write.
-/// Returns:
-///     A tag builder.
-HTMLTag!name classes(string name)(HTMLTag!name tag, string[] values...) @safe {
-    tag.beginAttributes();
-    pushElementMarkup(` class="`);
-    foreach (i, value; values) {
-        if (i) pushElementMarkup(" ");
-        pushElementText(value);
+    static if (withInterpolation) {
+        HTMLTag id(Ts...)(InterpolationHeader header, Ts value) @safe {
+            return attr("id", header, value);
+        }
     }
-    pushElementMarkup(`"`);
-    return tag.attributed;
-}
 
-/// Set the "href" attribute for an `<a>` element.
-/// Params:
-///     tag   = Tag builder for the target tag.
-///     value = Value to use for the attribute. Supports istrings.
-/// Returns:
-///     A tag builder.
-HTMLTag!"a" href(HTMLTag!"a" tag, string value) @safe {
-    return tag.attr("href", value);
-}
-
-static if (withInterpolation) {
-    /// ditto
-    Tag href(Ts...)(HTMLTag!"a" tag, InterpolationHeader header, Ts value) @safe {
-        return tag.attr("href", header, value);
+    /// Add a `class` attribute to a HTML tag.
+    /// Params:
+    ///     values = Classes to write.
+    /// Returns:
+    ///     A tag builder.
+    HTMLTag classes(string[] values...) @safe {
+        beginAttributes();
+        pushElementMarkup(` class="`);
+        foreach (i, value; values) {
+            if (i) pushElementMarkup(" ");
+            pushElementText(value);
+        }
+        pushElementMarkup(`"`);
+        return attributed;
     }
+
+    /// Set the "href" attribute for an `<a>` element.
+    /// Params:
+    ///     value = Value to use for the attribute. Supports istrings.
+    /// Returns:
+    ///     A tag builder.
+    HTMLTag href(string value) @safe {
+        return attr("href", value);
+    }
+
+    static if (withInterpolation) {
+        /// ditto
+        HTMLTag href(Ts...)(InterpolationHeader header, Ts value) @safe {
+            return attr("href", header, value);
+        }
+    }
+
 }
 
 /// Write HTML elements to an output range.
@@ -199,7 +206,7 @@ do {
         DocumentOutput(fragment => put(range, fragment)));
 }
 
-/// Write XML or HTML elements to a string or [Element].
+/// Write HTML elements to a string or [Element].
 ///
 /// Returns:
 ///     A struct that accepts an element block `~ (html) { }` and writes the content to a string.
@@ -211,13 +218,13 @@ TextHTML buildHTML() @safe {
 /// it uses an [std.array.Appender].
 @safe unittest {
     import std.array;
-    string stringOutput = buildHTML() ~ {
-        HTML.p ~ "Hello!";
+    string stringOutput = buildHTML() ~ (html) {
+        html.p ~ "Hello!";
     };
 
     Appender!string rangeOutput;
-    buildHTML(rangeOutput) ~ {
-        HTML.p ~ "Hello!";
+    buildHTML(rangeOutput) ~ (html) {
+        html.p ~ "Hello!";
     };
     assert(stringOutput == rangeOutput[]);
 }
@@ -225,13 +232,13 @@ TextHTML buildHTML() @safe {
 struct TextHTML {
     import std.array;
 
-    Element opBinary(string op : "~")(void delegate(HTML o) @system rhs) const @system {
+    Element opBinary(string op : "~")(void delegate(HTML) @system rhs) const @system {
         Appender!string output;
         rhs(sink(output));
         return elemTrusted(output[]);
     }
 
-    Element opBinary(string op : "~")(void delegate(HTML o) @safe rhs) const @safe {
+    Element opBinary(string op : "~")(void delegate(HTML) @safe rhs) const @safe {
         Appender!string output;
         rhs(sink(output));
         return elemTrusted(output[]);
@@ -251,11 +258,21 @@ struct HTML {
 
     alias documentOutput this;
 
-    void opBinary(string op : "~")(void delegate(HTML o) @system rhs) const @system {
+    void opBinary(string op : "~", T : string)(T rhs) @safe {
+        documentOutput ~ rhs;
+    }
+
+    static if (withInterpolation) {
+        void opBinary(string op : "~", Ts...)(InterpolationHeader, Ts text) {
+            pushElementText(text);
+        }
+    }
+
+    void opBinary(string op : "~")(void delegate(HTML o) @system rhs) @system {
         rhs(this);
     }
 
-    void opBinary(string op : "~")(void delegate(HTML o) @safe rhs) const @safe {
+    void opBinary(string op : "~")(void delegate(HTML o) @safe rhs) @safe {
         rhs(this);
     }
 
