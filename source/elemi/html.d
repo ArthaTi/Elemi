@@ -234,19 +234,18 @@ struct TextHTML {
 
     Element opBinary(string op : "~")(void delegate(HTML) @system rhs) const @system {
         Appender!string output;
-        rhs(sink(output));
+        rhs(
+            HTML(
+                DocumentOutput(fragment => output ~= fragment)));
         return elemTrusted(output[]);
     }
 
     Element opBinary(string op : "~")(void delegate(HTML) @safe rhs) const @safe {
         Appender!string output;
-        rhs(sink(output));
+        rhs(
+            HTML(
+                DocumentOutput(fragment => output ~= fragment)));
         return elemTrusted(output[]);
-    }
-
-    private static HTML sink(return ref Appender!string output) @safe {
-        return HTML(
-            DocumentOutput(fragment => output ~= fragment));
     }
 
 }

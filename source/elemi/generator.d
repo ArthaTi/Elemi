@@ -112,6 +112,16 @@ static if (withInterpolation) {
 
 }
 
+/// Elemi works at compile time!
+@safe unittest {
+    enum output = buildHTML ~ (html) {
+        html.div ~ {
+            html.p ~ "Hello, World!";
+        };
+    };
+    assert(output == "<div><p>Hello, World!</p></div>");
+}
+
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html ~ elem!"p"("Hello, World!");
@@ -399,7 +409,7 @@ struct DocumentOutput {
     /// Params:
     ///     content = Markup to output.
     void pushElementMarkup(string content) @safe {
-        assert(elementOutput,
+        assert(elementOutput !is null,
             "No Elemi context is currently active. Try prepending the document with "
             ~ "`buildDocument() ~`.");
         elementOutput(content);
