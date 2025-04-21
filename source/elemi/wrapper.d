@@ -5,18 +5,25 @@ module elemi.wrapper;
 @safe unittest {
     import elemi;
 
-    auto divWrapper = buildWrapper() ~ (content) {
-        HTML.span ~ { },
-        HTML.div ~ {
-            content();
+    auto text = buildHTML() ~ (html) {
+
+        // Wrapper
+        auto divWrapper = buildWrapper() ~ (content) {
+            html.span ~ { },
+            html.div ~ {
+                content();
+            };
         };
-    };
-    auto text = buildDocument() ~ {
+
+        // Content
         divWrapper ~ {
-            HTML ~ "My text";
+            html ~ "First wrapper";
+        };
+        divWrapper ~ {
+            html ~ "Second wrapper";
         };
     };
-    assert(text == "<span></span><div>My text</div>");
+    assert(text == "<span></span><div>First wrapper</div><span></span><div>Second wrapper</div>");
 
 }
 
@@ -24,18 +31,18 @@ module elemi.wrapper;
 @safe unittest {
     import elemi;
 
-    Wrapper section(string title) {
+    Wrapper section(HTML html, string title) {
         return buildWrapper() ~ (content) {
-            HTML.div ~ {
-                HTML.h1 ~ title;
+            html.div ~ {
+                html.h1 ~ title;
                 content();
             };
         };
     }
 
-    auto text = buildDocument() ~ {
-        section("Title") ~ {
-            HTML.p ~ "Content";
+    auto text = buildHTML() ~ (html) {
+        section(html, "Title") ~ {
+            html.p ~ "Content";
         };
     };
 
@@ -108,14 +115,16 @@ struct SystemWrapper {
 @system unittest {
     import elemi.html;
 
-    auto safeWrapper = buildWrapper() ~ (content) @safe {
-        HTML.h1 ~ { };
-        content();
-    };
+    auto safeWrapper(HTML html) {
+        return buildWrapper() ~ (content) @safe {
+            html.h1 ~ { };
+            content();
+        };
+    }
 
-    auto content = buildDocument() ~ () @system {
-        safeWrapper ~ () @safe {
-            HTML.h2 ~ { };
+    auto content = buildHTML() ~ (html) @system {
+        safeWrapper(html) ~ {
+            html.h2 ~ { };
         };
     };
 
@@ -126,14 +135,16 @@ struct SystemWrapper {
 @system unittest {
     import elemi.html;
 
-    auto systemWrapper = buildWrapper() ~ (content) @system {
-        HTML.h1 ~ { };
-        content();
-    };
+    auto systemWrapper(HTML html) {
+        return buildWrapper() ~ (content) @system {
+            html.h1 ~ { };
+            content();
+        };
+    }
 
-    auto content = buildDocument() ~ {
-        systemWrapper ~ () @safe {
-            HTML.h2 ~ { };
+    auto content = buildHTML() ~ (html) {
+        systemWrapper(html) ~ () @safe {
+            html.h2 ~ { };
         };
     };
 
