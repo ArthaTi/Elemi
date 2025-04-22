@@ -268,7 +268,7 @@ pure @safe unittest {
 // UTF-32 test: generally `string` is preferred and in most cases, is required. There's one exception, content, and it
 // must preserve the support.
 //
-// In the future, it might be preferrable to introduce support for any UTF encoding.
+// In the future, it might be preferable to introduce support for any UTF encoding.
 pure @safe unittest {
 
     import elemi;
@@ -281,5 +281,61 @@ pure @safe unittest {
     assert(elem!"div"(["class": "foo bar"], "Hello, World!"d) == `<div class="foo bar">Hello, World!</div>`);
     assert(elem!"p"(data) == `<p>Foo bar</p>`);
     assert(elem!"p"(dataArr) == `<p>Foo bar</p>`);
+
+}
+
+// readme.md example
+@safe unittest {
+
+    import elemi;
+
+    auto document = buildHTML() ~ (html) {
+        html ~ Element.HTMLDoctype;
+        html.html ~ {
+            html.head ~ {
+                html.title ~ "Hello, World!";
+                html ~ Element.MobileViewport;
+                html ~ Element.EncodingUTF8;
+            };
+            html.body.classes("home", "logged-in") ~ {
+                html.main ~ {
+
+                    html.img
+                        .attr("src", "/logo.png")
+                        .attr("alt", "Website logo") ~ { };
+
+                    html.p ~ {
+                        // All input is sanitized
+                        html ~ "My <hobbies>:";
+                    };
+
+                    html.ul ~ {
+                        foreach (item; ["Web development", "Music", "Trains"]) {
+                            html.li ~ item;
+                        }
+                    };
+
+                    // i-strings are supported
+                    html.p ~ i"1+2 is $(1+2).";
+                };
+            };
+        };
+    };
+
+    assert(document == `<!DOCTYPE html><html><head>`
+        ~ `<title>Hello, World!</title>`
+        ~ `<meta name="viewport" content="width=device-width, initial-scale=1"/>`
+        ~ `<meta charset="utf-8"/>`
+        ~ `</head>`
+        ~ `<body class="home logged-in"><main>`
+        ~ `<img src="/logo.png" alt="Website logo"/>`
+        ~ `<p>My &lt;hobbies&gt;:</p>`
+        ~ `<ul>`
+        ~ `<li>Web development</li>`
+        ~ `<li>Music</li>`
+        ~ `<li>Trains</li>`
+        ~ `</ul>`
+        ~ `<p>1+2 is 3.</p>`
+        ~ "</main></body></html>");
 
 }
