@@ -7,8 +7,9 @@ Visit the [online documentation](https://elemi.dpldocs.dlang.org/elemi.html) for
 ## New syntax
 
 As of 1.4.0, Elemi comes with two different flavors: the new one (`elemi.generator`), and the old
-one (`elemi.element`). Using the new syntax, HTML is output directly to a range or a string,
-making it more lightweight and faster. Additionally, it allows for control flow alongside content.
+one (`elemi.html` and `elemi.xml`). Using the new syntax, HTML is output directly to a range or a
+string, making it more lightweight and faster. Additionally, it allows for control flow alongside
+content.
 
 ```d
 import elemi;
@@ -56,7 +57,8 @@ The "classic" syntax is still available. It is simpler and easier to learn, but 
 slower.
 
 Read more about the old syntax through
-[`elemi.element`](https://elemi.dpldocs.dlang.org/elemi.element.html)
+[`elemi.html`](https://elemi.dpldocs.dlang.org/elemi.html.html)
+and [`elemi.xml`](https://elemi.dpldocs.dlang.org/elemi.xml.html)
 
 
 ```d
