@@ -1,13 +1,24 @@
 /// Wrappers allow defining custom HTML/XML structures that take children as content.
+///
+/// This module builds upon [elemi.generator](elemi.generator.html).
+///
+/// $(B [#examples|See examples] for usage instructions!)
+///
+/// History: $(LIST
+///     * Introduced in Elemi 1.4.0
+/// )
 module elemi.wrapper;
 
 /// Wrappers make it possible to place children inside chunks of premade HTML or XML code.
+/// A wrapper is given a function — `content` in this example — which writes user-given code
+/// to the output stream.
 @safe unittest {
     import elemi;
 
     auto text = buildHTML() ~ (html) {
 
-        // Wrapper
+        // Wrapper: <span></span><div>CONTENT</div>
+        // Prepends an empty span node, and wraps the content in a div.
         auto divWrapper = buildWrapper() ~ (content) {
             html.span ~ { },
             html.div ~ {
@@ -15,7 +26,7 @@ module elemi.wrapper;
             };
         };
 
-        // Content
+        // Place text content inside the wrapper
         divWrapper ~ {
             html ~ "First wrapper";
         };
@@ -59,12 +70,17 @@ else {
     alias mustuse = AliasSeq!();
 }
 
+/// Prepare a wrapper. Connect with a one parameter function: `buildWrapper ~ (content) { }`.
+/// The argument given, `content`, is a function, which can be called to write user-provided
+/// content.
 ///
 WrapperBuilder buildWrapper() @safe {
     return WrapperBuilder();
 }
 
+/// A wrapper builder. Create using `buildWrapper`.
 ///
+/// See [module documentation for examples](elemi.wrapper.html#examples).
 @mustuse
 struct WrapperBuilder {
 
@@ -78,18 +94,23 @@ struct WrapperBuilder {
 
 }
 
-///
+/// A wrapper element that can be used in `@safe` code.
 @mustuse
 struct Wrapper {
 
     alias Generator = void delegate() @safe;
 
+    /// Function generating wrapper code.
     void delegate(Generator) @safe generator;
 
+    /// Place XML/HTML code in this wrapper, and write it to the output stream.
+    /// Params:
+    ///     build = Function to write content inside the wrapper.
     void opBinary(string op : "~")(void delegate() @safe build) @safe {
         generator(build);
     }
 
+    /// ditto
     void opBinary(string op : "~")(void delegate() @system build) @system {
         Generator trustedBuild = () @trusted => build();
         generator(trustedBuild);
@@ -97,13 +118,18 @@ struct Wrapper {
 
 }
 
+/// A wrapper element that can only be used in `@system` code.
 @mustuse
 struct SystemWrapper {
 
-    alias Generator = void delegate() @safe;
+    alias Generator = Wrapper.Generator;
 
+    /// Function generating wrapper code.
     void delegate(Generator) generator;
 
+    /// Place XML/HTML code in this wrapper, and write it to the output stream.
+    /// Params:
+    ///     build = Function to write content inside the wrapper.
     void opBinary(string op : "~")(void delegate() @system build) @system {
         Generator trustedBuild = () @trusted => build();
         generator(trustedBuild);

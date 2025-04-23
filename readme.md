@@ -2,7 +2,64 @@
 
 Elemi is a tiny, dependency free library to make writing sanitized HTML and XML a bit easier.
 
-Check the [source code](source/elemi.d) or the [documentation](http://elemi.dpldocs.info) to learn how to use it!
+Visit the [online documentation](https://elemi.dpldocs.dlang.org/elemi.html) for reference.
+
+## New syntax
+
+As of 1.4.0, Elemi comes with two different flavors: the new one (`elemi.generator`), and the old
+one (`elemi.html` and `elemi.xml`). Using the new syntax, HTML is output directly to a range or a
+string, making it more lightweight and faster. Additionally, it allows for control flow alongside
+content.
+
+```d
+import elemi;
+
+auto document = buildHTML() ~ (html) {
+    html ~ Element.HTMLDoctype;
+    html.html ~ {
+        html.head ~ {
+            html.title ~ "Hello, World!";
+            html ~ Element.MobileViewport;
+            html ~ Element.EncodingUTF8;
+        };
+        html.body.classes("home", "logged-in") ~ {
+            html.main ~ {
+
+                html.img
+                    .attr("src", "/logo.png")
+                    .attr("alt", "Website logo") ~ { };
+
+                // All input is sanitized
+                html.p ~ {
+                    html ~ "My <hobbies>:";
+                };
+
+                // Control flow is allowed
+                html.ul ~ {
+                    foreach (item; ["Web development", "Music", "Trains"]) {
+                        html.li ~ item;
+                    }
+                };
+
+                // i-strings are supported
+                html.p ~ i"1+2 is $(1+2).";
+            };
+        };
+    };
+};
+```
+For more information on the new syntax, see [`elemi.generator` in the online
+documentation](https://elemi.dpldocs.dlang.org/elemi.generator.html)
+
+## Old syntax
+
+The "classic" syntax is still available. It is simpler and easier to learn, but more verbose and
+slower.
+
+Read more about the old syntax through
+[`elemi.html`](https://elemi.dpldocs.dlang.org/elemi.html.html)
+and [`elemi.xml`](https://elemi.dpldocs.dlang.org/elemi.xml.html)
+
 
 ```d
 import elemi;

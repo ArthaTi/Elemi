@@ -1,3 +1,5 @@
+/// This module holds the [Element] type, used and emitted by [elemi.html](elemi.html.html)
+/// and [elemi.xml](elemi.xml.html).
 module elemi.element;
 
 import std.string;
@@ -5,40 +7,69 @@ import std.string;
 import elemi;
 import elemi.internal;
 
-/// Represents a HTML element.
+/// Represents an HTML element. Elements can be created using [elem].
 ///
-/// Use `elem` to generate.
+/// `Element` implicitly converts to a string, but when passed to `elem`, it will be recognized
+/// as HTML code, and it will not be escaped.
+///
+/// ---
+/// Element e1 = elem!"div"();
+/// string  e2 = elem!"div"();
+/// elems(e1);  // <div></div>
+/// elems(e2);  // &lt;div&gt;&lt;/div&gt;
+/// ---
+///
+/// `Element` does not store its data in a structured manner, so its attributes and content cannot
+/// be read without using an XML parser. It does, however, have the capability of inserting
+/// attributes and content at runtime:
+///
+/// ---
+/// Element e = elem!"div"();
+/// e ~= attr("class") = "one";
+/// e ~= elem!"div"("two");
+/// e ~= "three";
+/// ---
 struct Element {
 
-    // Commonly used elements
-    enum {
+    /// [Document type declaration](https://en.wikipedia.org/wiki/Document_type_declaration) for
+    /// HTML, used to enable standards mode in browsers.
+    enum HTMLDoctype = elemX!("!DOCTYPE", "html");
 
-        /// Doctype info for HTML.
-        HTMLDoctype = elemX!("!DOCTYPE", "html"),
+    /// Prepend a document type declaration to your document.
+    pure @safe unittest {
+        auto html = elems(
+            Element.HTMLDoctype,
+            elem!"html"(),
+        );
 
-        /// XML declaration element. Uses version 1.1.
-        XMLDeclaration1_1 = elemX!"?xml"(
-            attr!"version" = "1.1",
-            attr!"encoding" = "UTF-8",
-        ),
-        XMLDeclaration1_0 = elemX!"?xml"(
-            attr!"version" = "1.0",
-            attr!"encoding" = "UTF-8",
-        ),
-        XMLDeclaration = XMLDeclaration1_1,
-
-        /// Enables UTF-8 encoding for the document
-        EncodingUTF8 = elemH!"meta"(
-            attr!"charset" = "utf-8",
-        ),
-
-        /// A common head element for adjusting the viewport to mobile devices.
-        MobileViewport = elemH!"meta"(
-            attr!"name" = "viewport",
-            attr!"content" = "width=device-width, initial-scale=1"
-        ),
-
+        assert(html == "<!DOCTYPE html><html></html>");
     }
+
+    /// XML declaration element. Uses version 1.1.
+    enum XMLDeclaration1_1 = elemX!"?xml"(
+        attr!"version" = "1.1",
+        attr!"encoding" = "UTF-8",
+    );
+
+    /// XML declaration element. Uses version 1.0.
+    enum XMLDeclaration1_0 = elemX!"?xml"(
+        attr!"version" = "1.0",
+        attr!"encoding" = "UTF-8",
+    );
+
+    /// Default XML declaration element, uses version 1.1.
+    alias XMLDeclaration = XMLDeclaration1_1;
+
+    /// Enables UTF-8 encoding for the document.
+    enum EncodingUTF8 = elemH!"meta"(
+        attr!"charset" = "utf-8",
+    );
+
+    /// A common head element for adjusting the viewport to mobile devices.
+    enum MobileViewport = elemH!"meta"(
+        attr!"name" = "viewport",
+        attr!"content" = "width=device-width, initial-scale=1"
+    );
 
     package {
 
@@ -51,7 +82,6 @@ struct Element {
 
     }
 
-    /// Create the tag.
     static package Element make(string tagName)() pure @safe
     in(tagName.length != 0, "Tag name cannot be empty")
     do {
@@ -101,7 +131,13 @@ struct Element {
 
     }
 
-    /// Check if the element allows content.
+    /// Returns:
+    ///     True if the element allows content.
+    ///
+    ///     To accept content, the element must have an end tag.
+    ///     In HTML, void elements such as `elemH!"input"` do not have one, and thus, cannot have
+    ///     content. In XML, a self closing tag (marked with `/`) `elemX!"tag/"` also cannot
+    ///     have content.
     bool acceptsContent() const pure @safe {
 
         return endTag.length || !startTag.length;
@@ -109,7 +145,12 @@ struct Element {
     }
 
     /// Add trusted XML/HTML code as a child of this node.
-    /// Returns: This node, to allow chaining.
+    /// See_Also:
+    ///     [elemTrusted] to construct an `Element` from XML/HTML source code.
+    /// Params:
+    ///     code = Raw XML/HTML code to insert into the element.
+    /// Returns:
+    ///     This node, to allow chaining.
     Element addTrusted(string code) pure @safe {
 
         assert(acceptsContent, "This element doesn't accept content");
@@ -119,6 +160,15 @@ struct Element {
 
     }
 
+    /// Append content to this node.
+    ///
+    /// Params:
+    ///     args = Content to append. The content can include: $(LIST
+    ///       * A child `Element`,
+    ///       * An [Attribute] for this element
+    ///       * An [i-string](https://dlang.org/spec/istring.html)
+    ///       * A regular [string]
+    ///     )
     void opOpAssign(string op = "~", Ts...)(Ts args) {
 
         import std.meta;
@@ -238,6 +288,9 @@ struct Element {
 
     }
 
+    /// Convert the element to a string.
+    ///
+    /// If `Element` is passed to something that expects a `string`, it will be casted implicitly.
     string toString() const pure @safe {
 
         import std.conv;
@@ -257,8 +310,9 @@ struct Element {
 
 }
 
-/// Creates an element to function as an element collection to place within other elements. This is functionally
-/// equivalent to a regular element, server-side, but is transparent for the rendered document.
+/// Creates an element to function as an element collection to place within other elements.
+/// For Elemi, it acts like an element, so it can accept child nodes, and can be appended to,
+/// but it is invisible for the generated document.
 Element elems(T...)(T content) {
 
     Element element;
@@ -279,7 +333,8 @@ pure @safe unittest {
 
 /// Create an element from trusted HTML/XML code.
 ///
-/// Warning: This element cannot have children added after being created. They will be added as siblings instead.
+/// Warning: This element cannot have children added after being created. They will be added as
+/// siblings instead.
 Element elemTrusted(string code) pure @safe {
 
     Element element;
