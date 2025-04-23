@@ -98,6 +98,31 @@ pure @safe unittest {
         ~ `</parent>`);
 }
 
+/// If you need to group a few elements together, you can do it with `elems`.
+pure @safe unittest {
+    auto child = elems(
+        "Hello, ",
+        elemX!"strong"("World"),
+    );
+    auto parent = elemX!"div"(
+        child,
+    );
+
+    assert(child == "Hello, <strong>World</strong>");
+    assert(parent == "<div>Hello, <strong>World</strong></div>");
+}
+
+/// If combined with a fresh compiler, Elemi also supports interpolated strings.
+static if (withInterpolation)
+pure @safe unittest{
+    auto e = elemX!"item"(
+        attr("expression") = i"1+2 = $(1+2)",
+        i"1+2 is $(1+2)",
+    );
+
+    assert(e == `<item expression="1+2 = 3">1+2 is 3</item>`);
+}
+
 /// `elemX` also supports DTD declarations like DOCTYPE, XML declarations, and even preprocessor
 /// tags.
 pure @safe unittest {
