@@ -6,6 +6,10 @@
 /// Note that the generator, at the moment, only supports HTML generation. While its output should
 /// be a valid XML document, it is unable to create tags other than HTML's own. The old
 /// [XML API](elemi.xml.html) should still be suitable for use with XML.
+///
+/// History: $(LIST
+///     * Introduced in Elemi 1.4.0
+/// )
 module elemi.generator;
 
 /// The [buildHTML] function is the entrypoint to generating HTML. Connect it to a HTML source:
