@@ -1,9 +1,23 @@
-/// This module provides syntax for generating HTML and XML documents from inside of D,
-/// including control flow.
+/// This module provides syntax for generating HTML and XML documents from inside of D.
+/// It supports embedded control flow (`if`, `foreach`, etc) and writing to output ranges.
+///
+/// $(B See the [#examples|examples] to get started!)
+///
+/// Note that the generator, at the moment, only supports HTML generation. While its output should
+/// be a valid XML document, it is unable to create tags other than HTML's own. The old
+/// [XML API](elemi.xml.html) should still be suitable for use with XML.
 module elemi.generator;
 
+/// The [buildHTML] function is the entrypoint to generating HTML. Connect it to a HTML source:
+/// a function to fill the HTML document with content.
+@safe unittest {
+    string output = buildHTML() ~ (html) {
+
+    };
+}
+
 /// Elements are created using a tilde, followed by curly braces. This syntax is called an
-/// **element block**.
+/// $(B element block).
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html.div ~ {
@@ -29,7 +43,7 @@ module elemi.generator;
     assert(output == `<a href="https://example.com">Visit my website!</a>`);
 }
 
-/// Common HTML attributes are available through methods.
+/// Common HTML attributes are available through specialized methods.
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html.div.id("my-div") ~ { };
@@ -41,7 +55,7 @@ module elemi.generator;
         ~ `<a href="https://example.com"></a>`);
 }
 
-/// Generate HTML tags with code.
+/// Use control flow statements like `if` and `foreach` to generate HTML with code.
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html.ul ~ {
@@ -53,7 +67,7 @@ module elemi.generator;
     assert(output == `<ul><li>1</li><li>2</li><li>3</li></ul>`);
 }
 
-/// Omit the tag name to append text.
+/// Omit the tag name to append text directly.
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html ~ "Hello, ";
@@ -62,7 +76,11 @@ module elemi.generator;
     assert(output == "Hello, <strong>World!</strong>");
 }
 
-/// All HTML content is automatically escaped.
+/// Keep your document safe from XSS injections: all HTML content is escaped automatically.
+///
+/// Warning: Elemi will $(B not) escape
+/// [javascript links](https://developer.mozilla.org/en-US/docs/Web/URI/Reference/Schemes/javascript).
+/// If you let your users input URLs, make sure to block the `javascript:` schema.
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html ~ "<script>alert('fool!')</script>";
@@ -122,6 +140,7 @@ static if (withInterpolation) {
     assert(output == "<div><p>Hello, World!</p></div>");
 }
 
+
 @safe unittest {
     string output = buildHTML() ~ (html) {
         html ~ elem!"p"("Hello, World!");
@@ -160,68 +179,18 @@ else {
 
 @safe:
 
-/// This special struct writes XML or HTML elements through a predicate function. It accepts an
-/// element block `~ { }` as input.
-///
-/// The predicate can be used with `std.range.input` to write content to an input range.
-@mustuse
-struct DocumentBuilder {
-
-    void delegate(string fragment) @safe sink;
-
-    void opBinary(string op : "~")(void delegate() @safe build) @safe {
-        elementOutput = (string fragment) => unaryFun!fun(fragment);
-        scope (exit) elementOutput = null;
-        build();
-    }
-
-    void opBinary(string op : "~")(void delegate() @system build) @system {
-        elementOutput = (string fragment) => unaryFun!fun(fragment);
-        scope (exit) elementOutput = null;
-        build();
-    }
-
-}
-
-/// This special struct writes XML or HTML elements to a string.
-///
-/// The resulting string is wrapped in an [Element] so it is recognized as a valid element
-/// by other parts of the Elemi API.
-@mustuse
-struct TextDocumentBuilder {
-
-    Element opBinary(string op : "~")(void delegate() @safe build) @safe {
-        Appender!string output;
-        elementOutput = (string fragment) => output ~= fragment;
-        scope (exit) elementOutput = null;
-        build();
-        return elemTrusted(output[]);
-    }
-
-    Element opBinary(string op : "~")(void delegate() @system build) @system {
-        Appender!string output;
-        elementOutput = (string fragment) => output ~= fragment;
-        scope (exit) elementOutput = null;
-        build();
-        return elemTrusted(output[]);
-    }
-
-}
-
-/// Generic XML tag.
+/// Generic XML or HTML tag.
 @mustuse
 struct Tag {
 
-    /// Output target for this tag; HTML code will be written to this destination.
+    /// Output target for this tag; XML/HTML code will be written to this destination.
     DocumentOutput output;
 
-    /// Name of this HTML tag.
+    /// Name of the XML or HTML tag, for example `book` for `<book>` or `div` for `<div></div>`.
     string tagName;
 
     /// If true, this is a "self-closing" tag. No child nodes or text can be added.
     bool isSelfClosing;
-
-    alias output this;
 
     /// The tag can be marked as self-closing so it does not generate content nor an end tag.
     unittest {
@@ -253,6 +222,8 @@ struct Tag {
     /// This changes whether the whole opening tag will be added when content starts (no
     /// attributes), or just the right bracket (with attributes).
     bool withAttributes;
+
+    alias output this;
 
     /// Returns:
     ///     The same tag, but marked using [withAttributes]. This should be used to return from
@@ -383,10 +354,15 @@ struct Tag {
 
 }
 
+/// A wrapper over a function, with additional methods added to support XML/HTML generation.
 struct DocumentOutput {
 
+    /// Function to call to append a string fragment to the output.
     void delegate(string fragment) @safe elementOutput;
 
+    /// Append a string or [Element] to the stream.
+    /// Params:
+    ///     rhs = `string` or `Element` to append.
     void opBinary(string op : "~", T : string)(T rhs) @safe {
         static if (is(T : const Element)) {
             pushElementMarkup(rhs);
@@ -396,9 +372,13 @@ struct DocumentOutput {
         }
     }
 
-    static if (withInterpolation)
-    void opBinary(string op : "~", Ts...)(InterpolationHeader, Ts text) {
-        pushElementText(text);
+    static if (withInterpolation) {
+        /// Write an [istring](https://dlang.org/spec/istring.html) to the stream.
+        /// Params:
+        ///     text = Text to write.
+        void opBinary(string op : "~", Ts...)(InterpolationHeader, Ts text) {
+            pushElementText(text);
+        }
     }
 
     /// Low-level function to write elements into current document context. Raw markup can be used,
@@ -416,6 +396,11 @@ struct DocumentOutput {
     }
 
     /// Low-level function to write escaped text.
+    ///
+    /// Any of the characters `<` (less than sign), `>` (greater than sign), `&` (ampersand),
+    /// `"` (quote mark), or `'` (apostrophe) will be replaced with the corresponding XML escape
+    /// code.
+    ///
     /// Params:
     ///     content = Content to write. Interpolated expression strings (istrings) are supported.
     void pushElementText(string content) {
@@ -493,8 +478,15 @@ private string escapeXML(char ch) {
     }
 }
 
-/// Generic HTML tag.
+/// HTML tag builder.
+///
+/// Params:
+///     name = Name of the tag, for example `div`.
 struct HTMLTag(string name) {
+
+    /// True if the tag is one of HTML's
+    /// [void elements](https://developer.mozilla.org/en-US/docs/Glossary/Void_element).
+    /// Void elements do not have an end tag, and thus, cannot have child nodes.
     enum isVoidTag = name == "area"
         || name == "base"
         || name == "br"
@@ -512,47 +504,60 @@ struct HTMLTag(string name) {
         || name == "track"
         || name == "wbr";
 
+    /// XML tag wrapped by this struct; tag this struct corresponds to.
     Tag tag;
+
     alias tag this;
 
+    /// Create a new instance of this tag for the specified document output.
+    /// Params:
+    ///     output = Document output instance this generator should write to.
     this(DocumentOutput output) {
         this.tag = Tag(output, name, isVoidTag);
     }
 
+    /// Pass any other tag as an instance of this tag.
+    /// Params:
+    ///     tag = XML or HTML tag to wrap.
     this(Tag tag) {
         this.tag = tag;
     }
 
+    /// Add an attribute to this element. This function wraps [Tag.attr].
     HTMLTag attr(Ts...)(Ts args) {
         return HTMLTag(
             tag.attr(args));
     }
 
-    HTMLTag attributed(Ts...)(Ts args) {
+    /// Returns:
+    ///     The same tag, but marked using [Tag.withAttributes]. This should be used to return
+    ///     from attribute-adding methods.
+    HTMLTag attributed() {
         return HTMLTag(
-            tag.attributed(args));
+            tag.attributed());
     }
 
     /// Add an `id` attribute to the HTML tag.
     /// Params:
     ///     value = Value to use for the attribute. Supports istrings.
     /// Returns:
-    ///     A tag builder.
+    ///     Tag builder, for chaining.
     HTMLTag id(string value) @safe {
         return attr("id", value);
     }
 
     static if (withInterpolation) {
+        /// ditto
         HTMLTag id(Ts...)(InterpolationHeader header, Ts value) @safe {
             return attr("id", header, value);
         }
     }
 
-    /// Add a `class` attribute to a HTML tag.
+    /// Add a `class` attribute to a HTML tag from an array of strings.
     /// Params:
-    ///     values = Classes to write.
+    ///     values = Classes to write, as an array. This array will be joined with spaces.
     /// Returns:
-    ///     A tag builder.
+    ///     Tag builder, for chaining.
     HTMLTag classes(string[] values...) @safe {
         beginAttributes();
         pushElementMarkup(` class="`);
@@ -589,6 +594,8 @@ struct HTMLTag(string name) {
 /// Returns:
 ///     A struct that accepts an element block `~ (html) { }` and writes the content to the output
 ///     range.
+/// See_Also:
+///     [HTML], the stream structure used to output data.
 HTML buildHTML(T)(ref T range)
 if (isOutputRange!(T, char))
 do {
@@ -600,6 +607,12 @@ do {
 ///
 /// Returns:
 ///     A struct that accepts an element block `~ (html) { }` and writes the content to a string.
+///
+///     The resulting content will be wrapped in an [Element], making it compatible with the
+///     [old elemi API](elemi.html.html). Note that metadata is not preserved, so adding
+///     attributes or child nodes from `Element` will not be possible.
+/// See_Also:
+///     [HTML], the stream structure used to output data.
 TextHTML buildHTML() @safe {
     return TextHTML();
 }
@@ -619,6 +632,7 @@ TextHTML buildHTML() @safe {
     assert(stringOutput == rangeOutput[]);
 }
 
+/// Supporting structure for [buildHTML].
 struct TextHTML {
     import std.array;
 
@@ -641,434 +655,581 @@ struct TextHTML {
 }
 
 /// A set of HTML tags to build documents with.
+///
+/// This structure includes a set of methods for creating HTML tags.
 struct HTML {
 
     DocumentOutput documentOutput;
 
     alias documentOutput this;
 
+    /// Write a string to the output stream.
+    /// Params:
+    ///     rhs = String to write.
     void opBinary(string op : "~", T : string)(T rhs) @safe {
         documentOutput ~ rhs;
     }
 
     static if (withInterpolation) {
+        /// Write an [istring](https://dlang.org/spec/istring.html) to the output stream.
+        /// Params:
+        ///     rhs = String to write.
         void opBinary(string op : "~", Ts...)(InterpolationHeader, Ts text) {
             pushElementText(text);
         }
     }
 
+    /// Pass self to a function.
+    /// Params:
+    ///     rhs = The function to read the output.
     void opBinary(string op : "~")(void delegate(HTML o) @system rhs) @system {
         rhs(this);
     }
 
+    /// ditto
     void opBinary(string op : "~")(void delegate(HTML o) @safe rhs) @safe {
         rhs(this);
     }
 
     @safe:
 
+    ///
     HTMLTag!"a" a() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"abbr" abbr() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"acronym" acronym() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"address" address() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"area" area() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"article" article() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"aside" aside() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"audio" audio() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"b" b() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"base" base() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"bdi" bdi() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"bdo" bdo() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"big" big() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"blockquote" blockquote() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"body" body() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"br" br() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"button" button() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"canvas" canvas() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"caption" caption() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"center" center() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"cite" cite() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"code" code() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"col" col() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"colgroup" colgroup() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"command" command() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"data" data() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"datalist" datalist() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"dd" dd() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"del" del() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"details" details() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"dfn" dfn() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"dialog" dialog() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"dir" dir() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"div" div() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"dl" dl() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"dt" dt() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"em" em() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"embed" embed() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"fencedframe" fencedframe() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"fieldset" fieldset() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"figcaption" figcaption() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"figure" figure() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"font" font() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"footer" footer() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"form" form() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"frame" frame() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"frameset" frameset() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"h1" h1() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"h2" h2() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"h3" h3() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"h4" h4() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"h5" h5() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"h6" h6() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"head" head() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"header" header() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"hgroup" hgroup() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"hr" hr() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"html" html() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"i" i() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"iframe" iframe() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"img" img() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"input" input() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"ins" ins() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"kbd" kbd() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"keygen" keygen() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"label" label() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"legend" legend() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"li" li() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"link" link() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"main" main() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"map" map() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"mark" mark() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"marquee" marquee() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"math" math() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"menu" menu() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"meta" meta() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"meter" meter() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"nav" nav() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"nobr" nobr() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"noembed" noembed() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"noframes" noframes() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"noscript" noscript() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"object" object() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"ol" ol() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"optgroup" optgroup() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"option" option() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"output" output() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"p" p() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"param" param() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"picture" picture() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"plaintext" plaintext() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"pre" pre() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"progress" progress() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"q" q() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"rb" rb() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"rp" rp() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"rt" rt() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"rtc" rtc() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"ruby" ruby() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"s" s() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"samp" samp() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"script" script() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"search" search() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"section" section() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"select" select() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"slot" slot() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"small" small() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"source" source() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"span" span() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"strike" strike() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"strong" strong() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"style" style() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"sub" sub() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"summary" summary() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"sup" sup() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"svg" svg() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"table" table() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"tbody" tbody() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"td" td() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"template" template_() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"textarea" textarea() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"tfoot" tfoot() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"th" th() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"thead" thead() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"time" time() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"title" title() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"tr" tr() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"track" track() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"tt" tt() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"u" u() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"ul" ul() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"var" var() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"video" video() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"wbr" wbr() {
         return typeof(return)(this);
     }
+    ///
     HTMLTag!"xmp" xmp() {
         return typeof(return)(this);
     }
