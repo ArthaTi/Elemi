@@ -112,15 +112,16 @@ pure @safe unittest {
     assert(parent == "<div>Hello, <strong>World</strong></div>");
 }
 
-/// If combined with a fresh compiler, Elemi also supports interpolated strings.
-static if (withInterpolation)
-pure @safe unittest{
-    auto e = elemX!"item"(
-        attr("expression") = i"1+2 = $(1+2)",
-        i"1+2 is $(1+2)",
-    );
+static if (imported!"elemi.internal".withInterpolation) {
+    /// If combined with a fresh compiler, Elemi also supports interpolated strings.
+    pure @safe unittest{
+        auto e = elemX!"item"(
+            attr("expression") = i"1+2 = $(1+2)",
+            i"1+2 is $(1+2)",
+        );
 
-    assert(e == `<item expression="1+2 = 3">1+2 is 3</item>`);
+        assert(e == `<item expression="1+2 = 3">1+2 is 3</item>`);
+    }
 }
 
 /// `elemX` also supports DTD declarations like DOCTYPE, XML declarations, and even preprocessor
