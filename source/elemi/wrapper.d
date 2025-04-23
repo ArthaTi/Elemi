@@ -67,6 +67,7 @@ static if (__traits(compiles, { import core.attribute : mustuse; })) {
     import core.attribute : mustuse;
 }
 else {
+    import std.meta : AliasSeq;
     alias mustuse = AliasSeq!();
 }
 
