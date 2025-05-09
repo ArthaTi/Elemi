@@ -164,6 +164,24 @@ static if (withInterpolation) {
     assert(output == "<p>Hello, World!</p> with <p>Hello, World!</p>");
 }
 
+@safe unittest {
+    // buildHTML() ~ null should work
+    void delegate(HTML) @safe htmlBuilder;
+    void delegate(HTML) @safe builder;
+
+    string output1 = buildHTML() ~ htmlBuilder;
+    assert(output1 == "");
+
+    string output2 = buildHTML() ~ (html) {
+        html ~ builder;
+    };
+    assert(output2 == "");
+
+    string output3 = buildHTML ~ builder;
+    assert(output3 == "");
+
+}
+
 import std.meta;
 import std.range;
 import std.string;
@@ -271,18 +289,18 @@ struct Tag {
 
     void opBinary(string op : "~")(void delegate() @safe builder) @safe {
         begin();
-        if (!isSelfClosing) {
+        if (!isSelfClosing && builder !is null) {
             builder();
-            end();
         }
+        end();
     }
 
     void opBinary(string op : "~")(void delegate() @system builder) @system {
         begin();
-        if (!isSelfClosing) {
+        if (!isSelfClosing && builder !is null) {
             builder();
-            end();
         }
+        end();
     }
 
     /// Add an attribute to the element.
@@ -642,17 +660,21 @@ struct TextHTML {
 
     Element opBinary(string op : "~")(void delegate(HTML) @system rhs) const @system {
         Appender!string output;
-        rhs(
-            HTML(
-                DocumentOutput(fragment => output ~= fragment)));
+        if (rhs !is null) {
+            rhs(
+                HTML(
+                    DocumentOutput(fragment => output ~= fragment)));
+        }
         return elemTrusted(output[]);
     }
 
     Element opBinary(string op : "~")(void delegate(HTML) @safe rhs) const @safe {
         Appender!string output;
-        rhs(
-            HTML(
-                DocumentOutput(fragment => output ~= fragment)));
+        if (rhs !is null) {
+            rhs(
+                HTML(
+                    DocumentOutput(fragment => output ~= fragment)));
+        }
         return elemTrusted(output[]);
     }
 
@@ -687,12 +709,16 @@ struct HTML {
     /// Params:
     ///     rhs = The function to read the output.
     void opBinary(string op : "~")(void delegate(HTML o) @system rhs) @system {
-        rhs(this);
+        if (rhs !is null) {
+            rhs(this);
+        }
     }
 
     /// ditto
     void opBinary(string op : "~")(void delegate(HTML o) @safe rhs) @safe {
-        rhs(this);
+        if (rhs !is null) {
+            rhs(this);
+        }
     }
 
     @safe:
