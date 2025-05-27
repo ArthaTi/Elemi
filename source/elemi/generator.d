@@ -303,6 +303,125 @@ struct Tag {
         end();
     }
 
+    /// Specify attributes using strings as key-value pairs. Interpolated strings are also
+    /// accepted.
+    ///
+    /// Note:
+    ///     At present, when using interpolated strings, the equals sign MUST be part of the
+    ///     literal, and cannot be interpolated.
+    ///
+    ///     An expression like this is allowed: `i"$(key)=$(value)"`. However, if the
+    ///     equal sign is interpolated, it will produce malformed code. Thus, a piece like
+    ///     `i"$("key=value")"` would fail.
+    Tag opIndex(Ts...)(Ts args) @safe {
+        import std.algorithm : findSplit, filter, joiner;
+
+        bool isValue;
+
+        foreach (i, arg; args) {
+            alias A = typeof(arg);
+            static if (isInterpolation!(i, Ts)) {
+                static if (is(A == InterpolationHeader)) {
+                    beginAttributes();
+                    withAttributes = true;
+                    isValue = false;
+                    pushElementMarkup(" ");
+                }
+                else static if (is(A == InterpolationFooter)) {
+                    if (isValue) {
+                        pushElementMarkup(`"`);
+                    }
+                    else {
+                        pushElementMarkup(`=""`);
+                    }
+                }
+                else static if (is(A == InterpolatedLiteral!text, string text)) {
+                    auto pair = text.findSplit("=");
+                    if (!isValue && pair) {
+                        pushElementText(pair[0]);
+                        pushElementMarkup(`="`);
+                        pushElementText(pair[2]);
+                        isValue = true;
+                    }
+                    else {
+                        pushElementText(text);
+                    }
+                }
+                else static if (isInputRange!A && is(ElementType!A : string)) {
+                    pushElementText(arg
+                        .filter!(a => a != "")
+                        .joiner(" "));
+                }
+                else {
+                    pushElementText(arg);
+                }
+            }
+            else static if (is(A == string)) {
+                auto pair = arg.findSplit("=");
+                this = attr(pair[0], pair[2]);                
+            }
+            else static assert(false, "Unsupported argument type " ~ A.stringof);
+        }
+
+        return attributed;
+    }
+
+    /// Each string (or istring) defines a single attribute. The first equals-sign in the string
+    /// separates the key from the value:
+    unittest {
+        string output = buildHTML() ~ (html) {
+            html.div["id=mydiv", "class=apple orange"] ~ { };
+        };
+        assert(output == `<div id="mydiv" class="apple orange"></div>`);
+    }
+
+    /// The equals sign is optional. If missing, the value will be empty.
+    unittest {
+        string output = buildHTML() ~ (html) {
+            html.input["type=checkbox", "checked"] ~ { };
+        };
+        assert(output == `<input type="checkbox" checked=""/>`);
+    }
+
+    /// Interpolated strings are supported. Ranges of strings are automatically joined with spaces.
+    static if (withInterpolation) {
+        unittest {
+            int number = 1;
+            string[] classes = ["two", "three", "four"];
+            
+            string output = buildHTML() ~ (html) {
+                html.div[i"id=item-$(number)", i"class=one $(classes) five", "checked"] ~ { };
+            };
+            assert(output == `<div id="item-1" class="one two three four five" checked=""></div>`);
+        }
+
+        /// Attribute names can also be interpolated.
+        unittest {
+            string key = "data-foo";
+            string output1 = buildHTML() ~ (html) {
+                html.div[i"$(key)=value"] ~ { };
+            };
+            assert(output1 == `<div data-foo="value"></div>`);
+
+            string state = "checked";
+            string output2 = buildHTML() ~ (html) {
+                html.input[i"$(state)", "type=checkbox"] ~ { };
+            };
+            assert(output2 == `<input checked="" type="checkbox"/>`);
+        }
+
+        unittest {
+            string key = "data";
+            string output = buildHTML() ~ (html) {
+                html.div[i"$(key)=$(key)=$(key)"] ~ { };
+            };
+            assert(output == `<div data="data=data"></div>`);
+        }
+
+        static assert( __traits(compiles, Tag()[i"$(1)"]));
+        static assert(!__traits(compiles, Tag()[1]));
+    }
+
     /// Add an attribute to the element.
     /// Params:
     ///     name  = Name of the attribute.
