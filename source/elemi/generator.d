@@ -144,6 +144,34 @@ static if (withInterpolation) {
     assert(output == "<div><p>Hello, World!</p></div>");
 }
 
+static if (withInterpolation) {
+
+    /// You can define a toHTML(HTML) method on your types to allow automatic conversion.
+    @safe unittest {
+
+        struct MyStruct {
+            string content;
+
+            void toHTML(HTML html) {
+                html.span.classes("my-struct") ~ {
+                    html ~ content;
+                };
+            }
+        }
+
+        auto s = MyStruct("hi");
+        auto output = buildHTML() ~ (html) {
+            html ~ i"My struct: $(s)";
+
+            // Or directly:
+            html ~ s;
+        };
+
+        assert(output == `My struct: <span class="my-struct">hi</span>`
+            ~ `<span class="my-struct">hi</span>`);
+    }
+
+}
 
 @safe unittest {
     string output = buildHTML() ~ (html) {
@@ -358,7 +386,7 @@ struct Tag {
             }
             else static if (is(A == string)) {
                 auto pair = arg.findSplit("=");
-                this = attr(pair[0], pair[2]);                
+                this = attr(pair[0], pair[2]);
             }
             else static assert(false, "Unsupported argument type " ~ A.stringof);
         }
@@ -388,7 +416,7 @@ struct Tag {
         unittest {
             int number = 1;
             string[] classes = ["two", "three", "four"];
-            
+
             string output = buildHTML() ~ (html) {
                 html.div[i"id=item-$(number)", i"class=one $(classes) five", "checked"] ~ { };
             };
@@ -501,10 +529,18 @@ struct DocumentOutput {
     /// Function to call to append a string fragment to the output.
     void delegate(string fragment) @safe elementOutput;
 
+    void opBinary(string op : "~", T)(T rhs) @safe
+    if (hasToHTML!T)
+    do {
+        rhs.toHTML(HTML(this));
+    }
+
     /// Append a string or [Element] to the stream.
     /// Params:
     ///     rhs = `string` or `Element` to append.
-    void opBinary(string op : "~", T : string)(T rhs) @safe {
+    void opBinary(string op : "~", T : string)(T rhs) @safe
+    if (!hasToHTML!T)
+    do {
         static if (is(T : const Element)) {
             pushElementMarkup(rhs);
         }
@@ -572,9 +608,18 @@ struct DocumentOutput {
         auto writer = EscapingElementWriter(this);
 
         foreach (item; content) {
-            static if (is(typeof(item) : Element)) {
-                pushElementMarkup(item);
+
+            // toHTML(HTML) is defined, try it
+            static if (hasToHTML!(typeof(item))) {
+                item.toHTML(HTML(this));
             }
+
+            // Implicit cast to (Element) allowed; do so
+            else static if (is(typeof(item) : Element)) {
+                pushElementMarkup(cast(Element) item);
+            }
+
+            // Write as text
             else {
                 formattedWrite!"%s"(writer, item);
             }
@@ -604,6 +649,9 @@ struct DocumentOutput {
     }
 
 }
+
+/// True, if given type defines a `toHTML(HTML)` method.
+enum hasToHTML(T) = __traits(compiles, T.init.toHTML(HTML.init));
 
 /// Escape an ASCII character using HTML escape codes.
 /// Returns:
