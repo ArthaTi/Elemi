@@ -621,7 +621,7 @@ struct DocumentOutput {
 
             // Write as text
             else {
-                formattedWrite!"%s"(writer, item);
+                writer.formattedWrite("%s", item);
             }
         }
 
