@@ -145,3 +145,21 @@ pure unittest {
         attr("class") = i"interpolate-$(123)-<unsafe>"
     ) == `<div class="interpolate-123-&lt;unsafe&gt;"></div>`);
 }
+
+/// Returns:
+///     True if the specified character is allowed in an attribute name.
+bool isAttributeNameCharacter(dchar ch) {
+    import std.algorithm : among;
+    import std.ascii : isControl;
+
+    return !ch.among('\0', '"', '\'', '>', '/', '=')
+        && !ch.isControl;
+}
+
+///
+unittest {
+    assert( 'a'.isAttributeNameCharacter);
+    assert( 'A'.isAttributeNameCharacter);
+    assert(!'='.isAttributeNameCharacter);
+    assert(!'/'.isAttributeNameCharacter);
+}
