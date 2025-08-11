@@ -214,12 +214,33 @@ static if (withInterpolation) {
     import std.exception;
 
     buildHTML() ~ (html) {
+        const h = "h";
+
         assertNotThrown(html.div["name"] ~ null);
         assertNotThrown(html.div["name=value"] ~ null);
 
         assertThrown(html.div["name/"] ~ null);
         assertThrown(html.div["key\0"] ~ null);
         assertThrown(html.div[">"] ~ null);
+
+        assertNotThrown(html.div[i"name"] ~ null);
+        assertNotThrown(html.div[i"name=value\0"] ~ null);
+        assertNotThrown(html.div[i"name=>"] ~ null);
+
+        assertThrown(html.div[i"name/"] ~ null);
+        assertThrown(html.div[i"key\0"] ~ null);
+        assertThrown(html.div[i">"] ~ null);
+
+        assertThrown(html.div[i"name/=value"] ~ null);
+        assertThrown(html.div[i"key\0=value"] ~ null);
+        assertThrown(html.div[i">=value"] ~ null);
+
+        assertNotThrown(html.div[i"$(h)=value"] ~ null);
+        assertNotThrown(html.div[i"key=$(h)"] ~ null);
+        assertNotThrown(html.div[i"key=<$(h)/>"] ~ null);
+
+        assertThrown(html.div[i"key\0=$(h)"] ~ null);
+        assertThrown(html.div[i"key$(h)/=$(h)"] ~ null);
     };
 }
 
@@ -355,7 +376,7 @@ struct Tag {
     ///     equal sign is interpolated, it will produce malformed code. Thus, a piece like
     ///     `i"$("key=value")"` would fail.
     Tag opIndex(Ts...)(Ts args) @safe {
-        import std.algorithm : findSplit, filter, joiner;
+        import std.algorithm : findSplit, filter, joiner, all;
 
         bool isValue;
 
@@ -377,15 +398,19 @@ struct Tag {
                     }
                 }
                 else static if (is(A == InterpolatedLiteral!text, string text)) {
-                    auto pair = text.findSplit("=");
+                    enum pair = text.findSplit("=");
+
                     if (!isValue && pair) {
-                        pushElementText(pair[0]);
+                        pushAttributeName(pair[0]);
                         pushElementMarkup(`="`);
                         pushElementText(pair[2]);
                         isValue = true;
                     }
-                    else {
+                    else if (isValue) {
                         pushElementText(text);
+                    }
+                    else {
+                        pushAttributeName(text);
                     }
                 }
                 else static if (isInputRange!A && is(ElementType!A : string)) {
