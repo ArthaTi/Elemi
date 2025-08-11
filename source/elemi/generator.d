@@ -213,7 +213,7 @@ static if (withInterpolation) {
 @safe unittest {
     import std.exception;
 
-    buildHTML() ~ (html) {
+    const gen = buildHTML() ~ (html) {
         const h = "h";
 
         assertNotThrown(html.div["name"] ~ null);
@@ -227,20 +227,20 @@ static if (withInterpolation) {
         assertNotThrown(html.div[i"name=value\0"] ~ null);
         assertNotThrown(html.div[i"name=>"] ~ null);
 
-        assertThrown(html.div[i"name/"] ~ null);
-        assertThrown(html.div[i"key\0"] ~ null);
-        assertThrown(html.div[i">"] ~ null);
+        static assert(!__traits(compiles, html.div[i"name/"] ~ null));
+        static assert(!__traits(compiles, html.div[i"key\0"] ~ null));
+        static assert(!__traits(compiles, html.div[i">"] ~ null));
 
-        assertThrown(html.div[i"name/=value"] ~ null);
-        assertThrown(html.div[i"key\0=value"] ~ null);
-        assertThrown(html.div[i">=value"] ~ null);
+        static assert(!__traits(compiles, html.div[i"name/=value"] ~ null));
+        static assert(!__traits(compiles, html.div[i"key\0=value"] ~ null));
+        static assert(!__traits(compiles, html.div[i">=value"] ~ null));
 
         assertNotThrown(html.div[i"$(h)=value"] ~ null);
         assertNotThrown(html.div[i"key=$(h)"] ~ null);
         assertNotThrown(html.div[i"key=<$(h)/>"] ~ null);
 
-        assertThrown(html.div[i"key\0=$(h)"] ~ null);
-        assertThrown(html.div[i"key$(h)/=$(h)"] ~ null);
+        static assert(!__traits(compiles, html.div[i"key\0=$(h)"] ~ null));
+        static assert(!__traits(compiles, html.div[i"key$(h)/=$(h)"] ~ null));
     };
 }
 
@@ -376,18 +376,27 @@ struct Tag {
     ///     equal sign is interpolated, it will produce malformed code. Thus, a piece like
     ///     `i"$("key=value")"` would fail.
     Tag opIndex(Ts...)(Ts args) @safe {
+        return opIndexImpl!(false, 0)(args);
+    }
+
+    private auto opIndexImpl(bool isValue, size_t start, Ts...)(Ts args) @safe {
         import std.algorithm : findSplit, filter, joiner, all;
 
-        bool isValue;
-
-        foreach (i, arg; args) {
+        foreach (localIndex, arg; args[start .. $]) {
+            enum i = start + localIndex;
             alias A = typeof(arg);
-            static if (isInterpolation!(i, Ts)) {
+
+            // Short circuit; do not process remaining arguments if this function already returned
+            static if (is(typeof(return))) {
+
+            }
+
+            else static if (isInterpolation!(i, Ts)) {
                 static if (is(A == InterpolationHeader)) {
                     beginAttributes();
                     withAttributes = true;
-                    isValue = false;
                     pushElementMarkup(" ");
+                    return opIndexImpl!(false, i + 1)(args);
                 }
                 else static if (is(A == InterpolationFooter)) {
                     if (isValue) {
@@ -400,13 +409,16 @@ struct Tag {
                 else static if (is(A == InterpolatedLiteral!text, string text)) {
                     enum pair = text.findSplit("=");
 
-                    if (!isValue && pair) {
+                    static assert(isValue || pair[0].all!isAttributeNameCharacter,
+                        "Invalid attribute name: " ~ pair[0]);
+
+                    static if (!isValue && pair) {
                         pushAttributeName(pair[0]);
                         pushElementMarkup(`="`);
                         pushElementText(pair[2]);
-                        isValue = true;
+                        return opIndexImpl!(true, i + 1)(args);
                     }
-                    else if (isValue) {
+                    else static if (isValue) {
                         pushElementText(text);
                     }
                     else {
@@ -414,6 +426,7 @@ struct Tag {
                     }
                 }
                 else static if (isInputRange!A && is(ElementType!A : string)) {
+                    // TODO this might output invalid characters
                     pushElementText(arg
                         .filter!(a => a != "")
                         .joiner(" "));
@@ -484,8 +497,10 @@ struct Tag {
             assert(output == `<div data="data=data"></div>`);
         }
 
-        static assert( __traits(compiles, Tag()[i"$(1)"]));
-        static assert(!__traits(compiles, Tag()[1]));
+        unittest {
+            static assert( __traits(compiles, Tag()[i"$(1)"]));
+            static assert(!__traits(compiles, Tag()[1]));
+        }
     }
 
     private void pushAttributeName(string name) {
