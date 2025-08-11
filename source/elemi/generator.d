@@ -210,6 +210,19 @@ static if (withInterpolation) {
 
 }
 
+@safe unittest {
+    import std.exception;
+
+    buildHTML() ~ (html) {
+        assertNotThrown(html.div["name"] ~ null);
+        assertNotThrown(html.div["name=value"] ~ null);
+
+        assertThrown(html.div["name/"] ~ null);
+        assertThrown(html.div["key\0"] ~ null);
+        assertThrown(html.div[">"] ~ null);
+    };
+}
+
 import std.meta;
 import std.range;
 import std.string;
@@ -450,6 +463,17 @@ struct Tag {
         static assert(!__traits(compiles, Tag()[1]));
     }
 
+    private void pushAttributeName(string name) {
+        import std.algorithm : all;
+
+        if (name.all!isAttributeNameCharacter) {
+            pushElementMarkup(name);
+        }
+        else {
+            throw new Exception("Invalid attribute name: " ~ name);
+        }
+    }
+
     /// Add an attribute to the element.
     /// Params:
     ///     name  = Name of the attribute.
@@ -465,7 +489,7 @@ struct Tag {
         Tag attr(Ts...)(string name, InterpolationHeader, Ts value) @safe {
             beginAttributes();
             pushElementMarkup(" ");
-            pushElementMarkup(name);
+            pushAttributeName(name);
             pushElementMarkup(`="`);
             pushElementText(value);
             pushElementMarkup(`"`);
@@ -482,7 +506,7 @@ struct Tag {
         beginAttributes();
         foreach (attribute; attributes) {
             pushElementMarkup(" ");
-            pushElementMarkup(attribute.name);
+            pushAttributeName(attribute.name);
             pushElementMarkup(`="`);
             pushElementText(attribute.value);
             pushElementMarkup(`"`);
